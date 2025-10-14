@@ -460,6 +460,72 @@ function AnalyzeContent() {
     }
   }
 
+  // Generate breadcrumb path segments
+  const generateBreadcrumbSegments = () => {
+    if (!currentLevel?.path || !path) return []
+    
+    const rootPath = path
+    const currentPath = currentLevel.path
+    
+    // Normalize paths (handle Windows backslashes)
+    const normalizedRootPath = rootPath.replace(/\\/g, '/')
+    const normalizedCurrentPath = currentPath.replace(/\\/g, '/')
+    
+    // Split paths into segments
+    const rootSegments = normalizedRootPath.split('/').filter(Boolean)
+    const currentSegments = normalizedCurrentPath.split('/').filter(Boolean)
+    
+    // Find the relative path from root
+    const segments = []
+    
+    // Always include the root directory
+    segments.push({
+      name: rootSegments[rootSegments.length - 1] || 'Root',
+      path: normalizedRootPath,
+      isClickable: currentPath !== rootPath
+    })
+    
+    // Add subdirectories if we're deeper than root
+    if (currentPath !== rootPath) {
+      const relativeSegments = currentSegments.slice(rootSegments.length)
+      for (let i = 0; i < relativeSegments.length; i++) {
+        const segment = relativeSegments[i]
+        const segmentPath = rootSegments.concat(relativeSegments.slice(0, i + 1)).join('/')
+        
+        segments.push({
+          name: segment,
+          path: segmentPath,
+          isClickable: i < relativeSegments.length - 1 // Last segment is not clickable
+        })
+      }
+    }
+    
+    return segments
+  }
+
+  // Handle breadcrumb click
+  const handleBreadcrumbClick = (targetPath: string) => {
+    // Normalize the target path
+    const normalizedTargetPath = targetPath.replace(/\\/g, '/')
+    
+    // Find the node in breadcrumb that matches the target path
+    const targetNode = breadcrumb.find(node => {
+      const normalizedNodePath = node.path.replace(/\\/g, '/')
+      return normalizedNodePath === normalizedTargetPath
+    })
+    
+    if (targetNode) {
+      const targetIndex = breadcrumb.findIndex(node => {
+        const normalizedNodePath = node.path.replace(/\\/g, '/')
+        return normalizedNodePath === normalizedTargetPath
+      })
+      const newBreadcrumb = breadcrumb.slice(0, targetIndex + 1)
+      setBreadcrumb(newBreadcrumb)
+      setCurrentLevel(targetNode)
+      setActivePath(null)
+    }
+  }
+
 
   return (
     <div className="w-[840px] h-[630px] bg-background overflow-hidden flex flex-col">
@@ -473,13 +539,26 @@ function AnalyzeContent() {
           }
         }
         
+        /* Chart hover effects - only when hovering directly on chart sectors */
+        .chart-sector:hover {
+          filter: brightness(1.1) drop-shadow(0 0 4px rgba(0,0,0,0.2)) !important;
+        }
+        
+        /* Dim other sectors when hovering on chart */
         .chart-container:hover .chart-sector:not(:hover) {
           opacity: 0.2 !important;
         }
         
-        .chart-sector:hover {
+        /* Dim sectors when File List item is hovered */
+        .chart-sector.dimmed-sector {
+          opacity: 0.2 !important;
+        }
+        
+        /* Brighten active sector when File List item is hovered */
+        .chart-sector.active-sector {
           filter: brightness(1.1) drop-shadow(0 0 4px rgba(0,0,0,0.2)) !important;
         }
+        
       `}</style>
       {/* Header */}
       <div className="flex items-center justify-between bg-card border-b border-border px-3 py-2 shadow-sm flex-shrink-0">
@@ -491,28 +570,34 @@ function AnalyzeContent() {
             <ArrowLeft className="w-3 h-3" />
             Home
           </button>
-          {breadcrumb.length > 1 && (
-            <>
-              <div className="w-px h-3 bg-border" />
-              <button
-                onClick={handleGoBack}
-                className="flex items-center gap-1.5 px-2 py-1 text-xs bg-primary/10 hover:bg-primary/20 text-primary rounded transition-all"
-              >
-                <ArrowLeft className="w-3 h-3" />
-                Up
-              </button>
-            </>
-          )}
         </div>
         <h1 className="text-sm font-bold text-foreground">ExpTech Studio</h1>
       </div>
 
-      {/* Path Display */}
-      <div className="bg-card border-b border-border px-3 py-1.5 flex-shrink-0">
-        <div className="flex items-center gap-2">
+      {/* Breadcrumb Navigation */}
+      <div className="bg-card border-b border-border px-3 py-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-muted-foreground font-medium">Path:</span>
-          <div className="text-xs font-mono text-foreground flex-1 truncate">
-            {currentLevel?.path || path}
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            {generateBreadcrumbSegments().map((segment, index) => (
+              <div key={index} className="flex items-center gap-1.5">
+                {index > 0 && (
+                  <span className="text-[10px] text-muted-foreground">/</span>
+                )}
+                <button
+                  onClick={() => segment.isClickable && handleBreadcrumbClick(segment.path)}
+                  className={`text-xs font-mono transition-all ${
+                    segment.isClickable
+                      ? 'text-primary hover:text-primary/80 hover:bg-primary/5 px-1.5 py-0.5 rounded'
+                      : 'text-foreground font-semibold'
+                  }`}
+                  disabled={!segment.isClickable}
+                  title={segment.path}
+                >
+                  {segment.name}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -587,7 +672,7 @@ function AnalyzeContent() {
                                     fill="transparent"
                                     strokeWidth={layer.outerRadius - layer.innerRadius}
                                     stroke={item.color}
-                                    className="chart-sector"
+                                    className={`chart-sector ${activePath === item.path ? 'active-sector' : ''} ${activePath !== null && activePath !== item.path ? 'dimmed-sector' : ''}`}
                                     style={{
                                       cursor: 'pointer',
                                       transition: 'opacity 0.2s ease, filter 0.2s ease',
@@ -598,6 +683,12 @@ function AnalyzeContent() {
                                         setCurrentLevel(item.node)
                                         setBreadcrumb([...breadcrumb, item.node])
                                       }
+                                    }}
+                                    onMouseEnter={() => {
+                                      setActivePath(item.path)
+                                    }}
+                                    onMouseLeave={() => {
+                                      setActivePath(null)
                                     }}
                                   >
                                     <title>{`${getFileIcon(item.name, item.node.isDirectory)} ${getFileTypeLabel(item.name, item.node.isDirectory)}
@@ -640,7 +731,7 @@ Size: ${formatBytes(item.value)}`}</title>
                                 fill={item.color}
                                 stroke="rgba(0,0,0,0.1)"
                                 strokeWidth={0.5}
-                                className="chart-sector"
+                                className={`chart-sector ${activePath === item.path ? 'active-sector' : ''} ${activePath !== null && activePath !== item.path ? 'dimmed-sector' : ''}`}
                                 style={{
                                   cursor: 'pointer',
                                   transition: 'opacity 0.2s ease, filter 0.2s ease',
@@ -651,6 +742,12 @@ Size: ${formatBytes(item.value)}`}</title>
                                     setCurrentLevel(item.node)
                                     setBreadcrumb([...breadcrumb, item.node])
                                   }
+                                }}
+                                onMouseEnter={() => {
+                                  setActivePath(item.path)
+                                }}
+                                onMouseLeave={() => {
+                                  setActivePath(null)
                                 }}
                               >
                                 <title>{`${getFileIcon(item.name, item.node.isDirectory)} ${getFileTypeLabel(item.name, item.node.isDirectory)}
@@ -681,7 +778,11 @@ Size: ${formatBytes(item.value)}`}</title>
               <div
                 key={item.path}
                 className={`flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent ${
-                  activePath === item.path ? 'bg-primary/5 border-primary/20' : 'hover:bg-muted/80 hover:border-muted-foreground/20'
+                  activePath === item.path 
+                    ? 'bg-primary/5 border-primary/20' 
+                    : activePath !== null && activePath !== item.path
+                    ? 'opacity-30'
+                    : 'hover:bg-muted/80 hover:border-muted-foreground/20'
                 }`}
                 onClick={() => handlePieClick(item, index)}
                 onMouseEnter={() => setActivePath(item.path)}
