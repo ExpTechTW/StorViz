@@ -2,8 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Sector } from 'recharts'
-import { ArrowLeft, Loader2, Folder, File } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
@@ -57,6 +56,74 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
 }
 
+function formatBytesCompact(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const value = bytes / Math.pow(k, i)
+
+  // Max 4 digits total (or 2 integer digits + 2 decimals)
+  if (value >= 100) {
+    return `${Math.round(value)} ${sizes[i]}`
+  } else if (value >= 10) {
+    return `${value.toFixed(1)} ${sizes[i]}`
+  } else {
+    return `${value.toFixed(2)} ${sizes[i]}`
+  }
+}
+
+function getFileIcon(fileName: string, isDirectory: boolean) {
+  if (isDirectory) return '📁'
+
+  const ext = fileName.split('.').pop()?.toLowerCase() || ''
+
+  // 圖片
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'].includes(ext)) return '🖼️'
+  // 影片
+  if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v'].includes(ext)) return '🎬'
+  // 音訊
+  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a'].includes(ext)) return '🎵'
+  // 壓縮檔
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso'].includes(ext)) return '📦'
+  // 程式碼
+  if (['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'c', 'cpp', 'cs', 'go', 'rs', 'php', 'rb', 'swift', 'kt'].includes(ext)) return '💻'
+  // 網頁
+  if (['html', 'htm', 'css', 'scss', 'sass', 'less'].includes(ext)) return '🌐'
+  // 文件
+  if (['txt', 'md', 'doc', 'docx', 'pdf', 'rtf'].includes(ext)) return '📄'
+  // 試算表
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊'
+  // 資料庫
+  if (['db', 'sqlite', 'sql', 'mdb'].includes(ext)) return '🗄️'
+  // 設定檔
+  if (['json', 'yaml', 'yml', 'toml', 'ini', 'conf', 'config'].includes(ext)) return '⚙️'
+  // 執行檔
+  if (['exe', 'msi', 'app', 'dmg', 'deb', 'rpm'].includes(ext)) return '⚡'
+
+  return '📄'
+}
+
+function getFileTypeLabel(fileName: string, isDirectory: boolean): string {
+  if (isDirectory) return 'Folder'
+
+  const ext = fileName.split('.').pop()?.toLowerCase() || ''
+
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'].includes(ext)) return 'Image'
+  if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v'].includes(ext)) return 'Video'
+  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a'].includes(ext)) return 'Audio'
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso'].includes(ext)) return 'Archive'
+  if (['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'c', 'cpp', 'cs', 'go', 'rs', 'php', 'rb', 'swift', 'kt'].includes(ext)) return 'Code'
+  if (['html', 'htm', 'css', 'scss', 'sass', 'less'].includes(ext)) return 'Web'
+  if (['txt', 'md', 'doc', 'docx', 'pdf', 'rtf'].includes(ext)) return 'Document'
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return 'Spreadsheet'
+  if (['db', 'sqlite', 'sql', 'mdb'].includes(ext)) return 'Database'
+  if (['json', 'yaml', 'yml', 'toml', 'ini', 'conf', 'config'].includes(ext)) return 'Config'
+  if (['exe', 'msi', 'app', 'dmg', 'deb', 'rpm'].includes(ext)) return 'Executable'
+
+  return 'File'
+}
+
 function AnalyzeContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -75,13 +142,11 @@ function AnalyzeContent() {
 
     // Generate event ID using seconds timestamp
     const eventId = Math.floor(Date.now() / 1000).toString()
-    console.log('[DEBUG] useEffect 觸發, eventId:', eventId)
 
     let unlistenFn: (() => void) | null = null
 
     const scanFolder = async () => {
       try {
-        console.log('[DEBUG] 開始掃描, setIsLoading(true)')
         setIsLoading(true)
         setScanProgress({ currentPath: path, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
 
@@ -95,15 +160,8 @@ function AnalyzeContent() {
         })
         unlistenFn = unlisten
 
-        console.log('[DEBUG] 開始調用 scan_directory, eventId:', eventId)
         const result = await invoke<{ node: FileNode; diskInfo?: { totalSpace: number; availableSpace: number; usedSpace: number } }>('scan_directory', { path, eventId })
 
-        console.log('[DEBUG] scan_directory 返回')
-        console.log('[DEBUG] result:', result)
-        console.log('[DEBUG] result.node:', result.node)
-        console.log('[DEBUG] result.diskInfo:', result.diskInfo)
-
-        console.log('[DEBUG] 設置資料, setIsLoading(false)')
         setData(result.node)
         setCurrentLevel(result.node)
         setBreadcrumb([result.node])
@@ -111,10 +169,8 @@ function AnalyzeContent() {
         setIsLoading(false)
         setScanProgress(null)
       } catch (error) {
-        console.log('[DEBUG] scan_directory 錯誤:', error)
         // Backend handles deduplication, silently ignore duplicate scan errors
       } finally {
-        console.log('[DEBUG] finally 區塊, unlisten')
         if (unlistenFn) {
           unlistenFn()
         }
@@ -125,7 +181,6 @@ function AnalyzeContent() {
 
     // Cleanup function - only unlisten, don't cancel state updates
     return () => {
-      console.log('[DEBUG] cleanup 函數執行')
       if (unlistenFn) {
         unlistenFn()
       }
@@ -133,11 +188,11 @@ function AnalyzeContent() {
   }, [path])
 
   // Helper functions must be defined before use
-  const prepareMultiLayerData = (rootNode: FileNode | null, maxDepth: number = 4): LayerData[] => {
+  const prepareMultiLayerData = (rootNode: FileNode | null, maxDepth: number = 10): LayerData[] => {
     if (!rootNode || !rootNode.children) return []
 
     const layers: Map<number, ChartData[]> = new Map()
-    const layerThickness = 40
+    const layerThickness = 18
 
     // Build hierarchical data with angle calculations
     const buildHierarchy = (
@@ -161,6 +216,12 @@ function AnalyzeContent() {
         const proportion = node.size / totalSize
         const nodeAngleRange = angleRange * proportion
         const nodeEndAngle = currentAngle + nodeAngleRange
+
+        // Filter out items with angle less than 2 degrees (except for innermost layer - depth 0)
+        if (depth > 0 && nodeAngleRange < 2) {
+          currentAngle = nodeEndAngle
+          return
+        }
 
         // Get color for this node
         const colorScheme = COLOR_SCHEMES[parentColorIndex % COLOR_SCHEMES.length]
@@ -217,6 +278,8 @@ function AnalyzeContent() {
         const nodeAngleRange = 360 * proportion
         const nodeEndAngle = currentAngle + nodeAngleRange
 
+        // Don't filter the root level (layer 0)
+
         const colorScheme = COLOR_SCHEMES[index % COLOR_SCHEMES.length]
         const color = colorScheme[0]
 
@@ -272,8 +335,8 @@ function AnalyzeContent() {
     // Convert map to array of layers
     const result: LayerData[] = []
     layers.forEach((data, depth) => {
-      const innerRadius = 60 + (depth * layerThickness)
-      const outerRadius = innerRadius + layerThickness - 3
+      const innerRadius = 40 + (depth * layerThickness)
+      const outerRadius = innerRadius + layerThickness - 2
 
       result.push({
         data,
@@ -306,19 +369,6 @@ function AnalyzeContent() {
   const layers = prepareMultiLayerData(currentLevel)
   const chartData = prepareChartData(currentLevel)
 
-  // Debug output - must be called on every render
-  useEffect(() => {
-    if (layers.length > 0) {
-      console.log('=== Layer Data ===')
-      layers.forEach((layer, idx) => {
-        console.log(`Layer ${idx} (depth ${layer.depth}):`)
-        layer.data.forEach(item => {
-          console.log(`  - ${item.name}: ${formatBytes(item.value)} [${item.startAngle?.toFixed(1)}° - ${item.endAngle?.toFixed(1)}°] (${((item.endAngle! - item.startAngle!)).toFixed(1)}°)`)
-        })
-      })
-    }
-  }, [layers.length, currentLevel?.path])
-
   const handlePieClick = (entry: ChartData, index: number) => {
     if (!currentLevel || !currentLevel.children) return
 
@@ -328,24 +378,6 @@ function AnalyzeContent() {
       setBreadcrumb([...breadcrumb, clickedNode])
       setActiveIndex(null)
     }
-  }
-
-  const renderActiveShape = (props: any) => {
-    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props
-
-    return (
-      <g>
-        <Sector
-          cx={cx}
-          cy={cy}
-          innerRadius={innerRadius}
-          outerRadius={outerRadius + 10}
-          startAngle={startAngle}
-          endAngle={endAngle}
-          fill={fill}
-        />
-      </g>
-    )
   }
 
   if (!path) {
@@ -428,77 +460,62 @@ function AnalyzeContent() {
 
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Home
-            </button>
-            {breadcrumb.length > 1 && (
-              <>
-                <span className="text-muted-foreground">|</span>
-                <button
-                  onClick={handleGoBack}
-                  className="flex items-center gap-2 px-4 py-2 text-sm bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-md transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Up One Level
-                </button>
-              </>
-            )}
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">Storage Analysis</h1>
+    <div className="w-[840px] h-[630px] bg-background overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between bg-card border-b border-border px-3 py-2 shadow-sm flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-all"
+          >
+            <ArrowLeft className="w-3 h-3" />
+            Home
+          </button>
+          {breadcrumb.length > 1 && (
+            <>
+              <div className="w-px h-3 bg-border" />
+              <button
+                onClick={handleGoBack}
+                className="flex items-center gap-1.5 px-2 py-1 text-xs bg-primary/10 hover:bg-primary/20 text-primary rounded transition-all"
+              >
+                <ArrowLeft className="w-3 h-3" />
+                Up
+              </button>
+            </>
+          )}
         </div>
+        <h1 className="text-sm font-bold text-foreground">ExpTech Studio</h1>
+      </div>
 
-        {/* Full Path Display */}
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="space-y-2">
-            <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-              Current Path
-            </div>
-            <div className="text-sm font-mono text-foreground bg-muted px-3 py-2 rounded-md break-all">
-              {currentLevel?.path || path}
-            </div>
+      {/* Path Display */}
+      <div className="bg-card border-b border-border px-3 py-1.5 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground font-medium">Path:</span>
+          <div className="text-xs font-mono text-foreground flex-1 truncate">
+            {currentLevel?.path || path}
           </div>
         </div>
+      </div>
 
-        {/* Debug Info */}
-        <div className="bg-card rounded-lg border border-border p-4">
-          <details className="cursor-pointer">
-            <summary className="text-sm font-medium text-muted-foreground">Debug Info (Click to expand)</summary>
-            <div className="mt-3 space-y-2 text-xs font-mono">
-              {layers.map((layer, idx) => (
-                <div key={idx} className="border-l-2 border-primary pl-3">
-                  <div className="font-bold text-foreground">Layer {idx} (Depth {layer.depth}):</div>
-                  {layer.data.map((item, itemIdx) => (
-                    <div key={itemIdx} className="ml-2 text-muted-foreground">
-                      • {item.name}: {formatBytes(item.value)}
-                      <span className="text-primary ml-2">
-                        [{item.startAngle?.toFixed(1)}° → {item.endAngle?.toFixed(1)}°]
-                      </span>
-                      <span className="text-secondary ml-1">
-                        ({((item.endAngle! - item.startAngle!)).toFixed(1)}°)
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ))}
+      <div className="flex-1 grid grid-cols-[1fr_260px] overflow-hidden">
+        <div className="bg-card border-r border-border p-3 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between mb-2 flex-shrink-0">
+            <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <span className="w-0.5 h-3 bg-primary rounded-full"></span>
+              Storage Distribution
+            </h2>
+            <div className="text-right">
+              <div className="text-xs font-bold text-foreground">
+                {formatBytesCompact(currentLevel?.size || 0)}
+              </div>
+              <div className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                {currentLevel?.name || 'Total'}
+              </div>
             </div>
-          </details>
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-6">
-          <div className="bg-card rounded-lg border border-border p-6">
-            <h2 className="text-lg font-semibold mb-4 text-foreground">Nested Storage Distribution</h2>
-            {layers.length > 0 ? (
-              <div className="relative">
-                <div className="relative z-0">
-                  <svg width="100%" height={500} viewBox="0 0 500 500">
+          </div>
+          {layers.length > 0 ? (
+            <div className="flex-1 flex items-center justify-center overflow-hidden">
+              <svg width="100%" height="100%" viewBox="0 0 500 500" className="max-h-full">
                     {layers.map((layer, layerIndex) => {
                       const centerX = 250
                       const centerY = 250
@@ -535,9 +552,9 @@ function AnalyzeContent() {
                                       setActiveIndex(null)
                                     }}
                                   >
-                                    <title>
-                                      {item.node.isDirectory ? '📁 Folder' : '📄 File'}: {item.name} - {formatBytes(item.value)}
-                                    </title>
+                                    <title>{`${getFileIcon(item.name, item.node.isDirectory)} ${getFileTypeLabel(item.name, item.node.isDirectory)}
+${item.name}
+Size: ${formatBytes(item.value)}`}</title>
                                   </circle>
                                 </g>
                               )
@@ -591,9 +608,9 @@ function AnalyzeContent() {
                                   setActiveIndex(null)
                                 }}
                               >
-                                <title>
-                                  {item.node.isDirectory ? '📁 Folder' : '📄 File'}: {item.name} - {formatBytes(item.value)}
-                                </title>
+                                <title>{`${getFileIcon(item.name, item.node.isDirectory)} ${getFileTypeLabel(item.name, item.node.isDirectory)}
+${item.name}
+Size: ${formatBytes(item.value)}`}</title>
                               </path>
                             )
                           })}
@@ -601,56 +618,48 @@ function AnalyzeContent() {
                       )
                     })}
                   </svg>
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                  <div className="text-center max-w-[120px]">
-                    <div className="text-xl font-bold text-foreground break-words">
-                      {formatBytes(currentLevel?.size || 0)}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {currentLevel?.name || 'Total'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="h-[500px] flex items-center justify-center text-muted-foreground">
-                Empty folder
-              </div>
-            )}
-          </div>
-
-          <div className="bg-card rounded-lg border border-border p-6">
-            <h2 className="text-lg font-semibold mb-4 text-foreground">File List (Current Level)</h2>
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
-              {chartData.map((item, index) => (
-                <div
-                  key={item.path}
-                  className="flex items-center justify-between p-3 rounded-md hover:bg-muted transition-colors cursor-pointer"
-                  onClick={() => handlePieClick(item, index)}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onMouseLeave={() => setActiveIndex(null)}
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {item.node.isDirectory ? (
-                      <Folder className="w-4 h-4 text-primary flex-shrink-0" />
-                    ) : (
-                      <File className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    )}
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-sm text-foreground truncate">
-                      {item.name}
-                    </span>
-                  </div>
-                  <div className="text-sm font-medium text-muted-foreground ml-4">
-                    {formatBytes(item.value)}
-                  </div>
-                </div>
-              ))}
             </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
+              Empty folder
+            </div>
+          )}
+        </div>
+
+        <div className="bg-card p-3 flex flex-col overflow-hidden">
+          <h2 className="text-xs font-semibold mb-2 text-foreground flex items-center gap-1.5 flex-shrink-0">
+            <span className="w-0.5 h-3 bg-primary rounded-full"></span>
+            Files & Folders
+          </h2>
+          <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-0.5">
+            {chartData.map((item, index) => (
+              <div
+                key={item.path}
+                className={`flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent ${
+                  activeIndex === index ? 'bg-primary/5 border-primary/20' : 'hover:bg-muted/50'
+                }`}
+                onClick={() => handlePieClick(item, index)}
+                onMouseEnter={() => setActiveIndex(index)}
+                onMouseLeave={() => setActiveIndex(null)}
+                title={`${getFileIcon(item.name, item.node.isDirectory)} ${item.name} - ${formatBytes(item.value)}`}
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-sm flex-shrink-0">
+                    {getFileIcon(item.name, item.node.isDirectory)}
+                  </span>
+                  <div
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className="text-xs text-foreground truncate font-medium">
+                    {item.name}
+                  </span>
+                </div>
+                <div className="text-[10px] font-semibold text-muted-foreground ml-2 tabular-nums">
+                  {formatBytes(item.value)}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

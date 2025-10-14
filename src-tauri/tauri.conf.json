@@ -22,8 +22,11 @@
     "windows": [
       {
         "title": "StorViz - Storage Visualization",
-        "width": 1200,
-        "height": 800
+        "width": 840,
+        "height": 630,
+        "resizable": false,
+        "fullscreen": false,
+        "maximizable": false
       }
     ],
     "security": {
