@@ -134,7 +134,6 @@ function AnalyzeContent() {
   const [data, setData] = useState<FileNode | null>(null)
   const [currentLevel, setCurrentLevel] = useState<FileNode | null>(null)
   const [breadcrumb, setBreadcrumb] = useState<FileNode[]>([])
-  const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [activePath, setActivePath] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [scanProgress, setScanProgress] = useState<{ currentPath: string; filesScanned: number; scannedSize: number; estimatedTotal: number } | null>(null)
@@ -379,7 +378,7 @@ function AnalyzeContent() {
     if (clickedNode && clickedNode.isDirectory && clickedNode.children) {
       setCurrentLevel(clickedNode)
       setBreadcrumb([...breadcrumb, clickedNode])
-      setActiveIndex(null)
+      setActivePath(null)
     }
   }
 
@@ -457,7 +456,7 @@ function AnalyzeContent() {
       const newBreadcrumb = breadcrumb.slice(0, -1)
       setBreadcrumb(newBreadcrumb)
       setCurrentLevel(newBreadcrumb[newBreadcrumb.length - 1])
-      setActiveIndex(null)
+      setActivePath(null)
     }
   }
 
@@ -472,6 +471,14 @@ function AnalyzeContent() {
           to {
             opacity: 1;
           }
+        }
+        
+        .chart-container:hover .chart-sector:not(:hover) {
+          opacity: 0.2 !important;
+        }
+        
+        .chart-sector:hover {
+          filter: brightness(1.1) drop-shadow(0 0 4px rgba(0,0,0,0.2)) !important;
         }
       `}</style>
       {/* Header */}
@@ -531,7 +538,7 @@ function AnalyzeContent() {
                 width="100%"
                 height="100%"
                 viewBox="0 0 500 500"
-                className="max-h-full transition-all duration-500 ease-in-out"
+                className="chart-container max-h-full transition-all duration-500 ease-in-out"
                 style={{
                   opacity: 1,
                   transform: 'scale(1)'
@@ -580,10 +587,10 @@ function AnalyzeContent() {
                                     fill="transparent"
                                     strokeWidth={layer.outerRadius - layer.innerRadius}
                                     stroke={item.color}
+                                    className="chart-sector"
                                     style={{
                                       cursor: 'pointer',
-                                      transition: 'opacity 0.2s ease',
-                                      opacity: activePath !== null && activePath !== item.path ? 0.3 : 1,
+                                      transition: 'opacity 0.2s ease, filter 0.2s ease',
                                       animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                     }}
                                     onClick={() => {
@@ -591,14 +598,6 @@ function AnalyzeContent() {
                                         setCurrentLevel(item.node)
                                         setBreadcrumb([...breadcrumb, item.node])
                                       }
-                                    }}
-                                    onMouseEnter={() => {
-                                      setActivePath(item.path)
-                                      setActiveIndex(index)
-                                    }}
-                                    onMouseLeave={() => {
-                                      setActivePath(null)
-                                      setActiveIndex(null)
                                     }}
                                   >
                                     <title>{`${getFileIcon(item.name, item.node.isDirectory)} ${getFileTypeLabel(item.name, item.node.isDirectory)}
@@ -641,10 +640,10 @@ Size: ${formatBytes(item.value)}`}</title>
                                 fill={item.color}
                                 stroke="rgba(0,0,0,0.1)"
                                 strokeWidth={0.5}
+                                className="chart-sector"
                                 style={{
                                   cursor: 'pointer',
-                                  transition: 'opacity 0.2s ease',
-                                  opacity: activePath !== null && activePath !== item.path ? 0.3 : 1,
+                                  transition: 'opacity 0.2s ease, filter 0.2s ease',
                                   animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                 }}
                                 onClick={() => {
@@ -652,14 +651,6 @@ Size: ${formatBytes(item.value)}`}</title>
                                     setCurrentLevel(item.node)
                                     setBreadcrumb([...breadcrumb, item.node])
                                   }
-                                }}
-                                onMouseEnter={() => {
-                                  setActivePath(item.path)
-                                  setActiveIndex(index)
-                                }}
-                                onMouseLeave={() => {
-                                  setActivePath(null)
-                                  setActiveIndex(null)
                                 }}
                               >
                                 <title>{`${getFileIcon(item.name, item.node.isDirectory)} ${getFileTypeLabel(item.name, item.node.isDirectory)}
@@ -690,11 +681,11 @@ Size: ${formatBytes(item.value)}`}</title>
               <div
                 key={item.path}
                 className={`flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent ${
-                  activeIndex === index ? 'bg-primary/5 border-primary/20' : 'hover:bg-muted/50'
+                  activePath === item.path ? 'bg-primary/5 border-primary/20' : 'hover:bg-muted/80 hover:border-muted-foreground/20'
                 }`}
                 onClick={() => handlePieClick(item, index)}
-                onMouseEnter={() => setActiveIndex(index)}
-                onMouseLeave={() => setActiveIndex(null)}
+                onMouseEnter={() => setActivePath(item.path)}
+                onMouseLeave={() => setActivePath(null)}
                 title={`${getFileIcon(item.name, item.node.isDirectory)} ${item.name} - ${formatBytes(item.value)}`}
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
