@@ -21,7 +21,7 @@
   "app": {
     "windows": [
       {
-        "title": "StorViz - Storage Visualization",
+        "title": "StorViz - ExpTech Studio",
         "width": 840,
         "height": 630,
         "resizable": false,
