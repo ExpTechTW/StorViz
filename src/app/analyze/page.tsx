@@ -394,9 +394,10 @@ function AnalyzeContent() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-2xl space-y-6">
-          <div className="text-center">
+          <div className="text-center space-y-2">
             <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
             <p className="text-lg font-medium text-foreground">正在掃描資料夾</p>
+            <p className="text-sm text-muted-foreground">檔案較多時可能會需要較長時間，請耐心等待</p>
           </div>
 
           {scanProgress && scanProgress.filesScanned > 0 && (
