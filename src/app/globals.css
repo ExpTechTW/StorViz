@@ -186,3 +186,48 @@
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: oklch(0.5 0.04 250);
 }
+
+/* SVG Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes sectorGrow {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rotateCircle {
+  from {
+    transform: rotate(-90deg);
+  }
+
+  to {
+    transform: rotate(270deg);
+  }
+}

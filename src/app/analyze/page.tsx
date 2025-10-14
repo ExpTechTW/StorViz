@@ -135,6 +135,7 @@ function AnalyzeContent() {
   const [currentLevel, setCurrentLevel] = useState<FileNode | null>(null)
   const [breadcrumb, setBreadcrumb] = useState<FileNode[]>([])
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const [activePath, setActivePath] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [scanProgress, setScanProgress] = useState<{ currentPath: string; filesScanned: number; scannedSize: number; estimatedTotal: number } | null>(null)
   const [diskInfo, setDiskInfo] = useState<{ totalSpace: number; availableSpace: number; usedSpace: number } | null>(null)
@@ -320,7 +321,7 @@ function AnalyzeContent() {
         layers.get(0)!.push({
           name: '可用空間',
           value: diskInfo.availableSpace,
-          color: 'rgba(200, 200, 200, 0.3)', // Transparent gray
+          color: 'rgba(128, 128, 128, 0.4)', // Semi-transparent gray
           path: '',
           node: {
             name: '可用空間',
@@ -506,26 +507,32 @@ function AnalyzeContent() {
               <span className="w-0.5 h-3 bg-primary rounded-full"></span>
               Storage Distribution
             </h2>
-            <div className={`text-xs font-bold truncate max-w-[200px] ${currentLevel === data ? 'text-primary' : 'text-foreground'}`}>
-              {currentLevel === data && diskInfo ? (
-                <span className="flex items-center gap-1">
-                  💾 {currentLevel?.name || path?.split('\\').pop() || path?.split('/').pop() || 'Disk'}
-                </span>
-              ) : (
-                currentLevel?.name || 'Total'
-              )}
+            <div className="text-xs font-bold text-foreground truncate max-w-[200px]">
+              {currentLevel === data && diskInfo
+                ? (currentLevel?.name || path?.split('\\').pop() || path?.split('/').pop() || 'Disk')
+                : (currentLevel?.name || 'Total')
+              }
             </div>
           </div>
           {layers.length > 0 ? (
             <div className="flex-1 flex items-center justify-center overflow-hidden">
-              <svg width="100%" height="100%" viewBox="0 0 500 500" className="max-h-full">
+              <svg 
+                width="100%" 
+                height="100%" 
+                viewBox="0 0 500 500" 
+                className="max-h-full transition-all duration-500 ease-in-out"
+                style={{ 
+                  opacity: 1,
+                  transform: 'scale(1)'
+                }}
+              >
                     {/* Center size display */}
                     <text
                       x="250"
                       y="245"
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      className="fill-foreground"
+                      className="fill-foreground transition-all duration-300"
                       style={{ fontSize: '18px', fontWeight: 'bold' }}
                     >
                       {formatBytesCompact(currentLevel?.size || 0).split(' ')[0]}
@@ -535,7 +542,7 @@ function AnalyzeContent() {
                       y="265"
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      className="fill-muted-foreground"
+                      className="fill-muted-foreground transition-all duration-300"
                       style={{ fontSize: '14px', fontWeight: '500' }}
                     >
                       {formatBytesCompact(currentLevel?.size || 0).split(' ')[1]}
@@ -551,28 +558,35 @@ function AnalyzeContent() {
 
                             // Special case: full circle (360°)
                             if (Math.abs(angleRange - 360) < 0.01) {
+                              const radius = (layer.innerRadius + layer.outerRadius) / 2
+
                               return (
                                 <g key={`sector-${layerIndex}-${index}`}>
                                   <circle
                                     cx={centerX}
                                     cy={centerY}
-                                    r={(layer.innerRadius + layer.outerRadius) / 2}
+                                    r={radius}
                                     fill="transparent"
                                     strokeWidth={layer.outerRadius - layer.innerRadius}
                                     stroke={item.color}
-                                    style={{ cursor: 'pointer' }}
+                                    style={{
+                                      cursor: 'pointer',
+                                      transition: 'opacity 0.2s ease',
+                                      opacity: activePath !== null && activePath !== item.path ? 0.3 : 1,
+                                      animation: `fadeIn 0.4s ease-out ${layerIndex * 0.1}s forwards`
+                                    }}
                                     onClick={() => {
                                       if (item.node.isDirectory && item.node.children) {
                                         setCurrentLevel(item.node)
                                         setBreadcrumb([...breadcrumb, item.node])
                                       }
                                     }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.opacity = '0.8'
+                                    onMouseEnter={() => {
+                                      setActivePath(item.path)
                                       setActiveIndex(index)
                                     }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.opacity = '1'
+                                    onMouseLeave={() => {
+                                      setActivePath(null)
                                       setActiveIndex(null)
                                     }}
                                   >
@@ -616,19 +630,24 @@ Size: ${formatBytes(item.value)}`}</title>
                                 fill={item.color}
                                 stroke="rgba(0,0,0,0.1)"
                                 strokeWidth={0.5}
-                                style={{ cursor: 'pointer' }}
+                                style={{
+                                  cursor: 'pointer',
+                                  transition: 'opacity 0.2s ease',
+                                  opacity: activePath !== null && activePath !== item.path ? 0.3 : 1,
+                                  animation: `fadeIn 0.4s ease-out ${layerIndex * 0.1}s forwards`
+                                }}
                                 onClick={() => {
                                   if (item.node.isDirectory && item.node.children) {
                                     setCurrentLevel(item.node)
                                     setBreadcrumb([...breadcrumb, item.node])
                                   }
                                 }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.opacity = '0.8'
+                                onMouseEnter={() => {
+                                  setActivePath(item.path)
                                   setActiveIndex(index)
                                 }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.opacity = '1'
+                                onMouseLeave={() => {
+                                  setActivePath(null)
                                   setActiveIndex(null)
                                 }}
                               >
