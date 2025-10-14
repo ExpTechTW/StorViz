@@ -379,6 +379,57 @@ function AnalyzeContent() {
                       return (
                         <g key={`layer-${layerIndex}`}>
                           {layer.data.map((item, index) => {
+                            const angleRange = (item.endAngle || 0) - (item.startAngle || 0)
+
+                            // Special case: full circle (360°)
+                            if (Math.abs(angleRange - 360) < 0.01) {
+                              return (
+                                <g key={`sector-${layerIndex}-${index}`}>
+                                  <circle
+                                    cx={centerX}
+                                    cy={centerY}
+                                    r={layer.outerRadius}
+                                    fill={item.color}
+                                    stroke="rgba(0,0,0,0.1)"
+                                    strokeWidth={0.5}
+                                  />
+                                  <circle
+                                    cx={centerX}
+                                    cy={centerY}
+                                    r={layer.innerRadius}
+                                    fill="white"
+                                  />
+                                  <circle
+                                    cx={centerX}
+                                    cy={centerY}
+                                    r={(layer.innerRadius + layer.outerRadius) / 2}
+                                    fill="transparent"
+                                    strokeWidth={layer.outerRadius - layer.innerRadius}
+                                    stroke={item.color}
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => {
+                                      if (item.node.isDirectory && item.node.children) {
+                                        setCurrentLevel(item.node)
+                                        setBreadcrumb([...breadcrumb, item.node])
+                                      }
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.opacity = '0.8'
+                                      setActiveIndex(index)
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.opacity = '1'
+                                      setActiveIndex(null)
+                                    }}
+                                  >
+                                    <title>
+                                      {item.node.isDirectory ? '📁 Folder' : '📄 File'}: {item.name} - {formatBytes(item.value)}
+                                    </title>
+                                  </circle>
+                                </g>
+                              )
+                            }
+
                             const startAngle = (item.startAngle || 0) - 90
                             const endAngle = (item.endAngle || 0) - 90
                             const startRad = (startAngle * Math.PI) / 180
