@@ -464,6 +464,16 @@ function AnalyzeContent() {
 
   return (
     <div className="w-[840px] h-[630px] bg-background overflow-hidden flex flex-col">
+      <style jsx>{`
+        @keyframes layerFadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+      `}</style>
       {/* Header */}
       <div className="flex items-center justify-between bg-card border-b border-border px-3 py-2 shadow-sm flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -516,12 +526,13 @@ function AnalyzeContent() {
           </div>
           {layers.length > 0 ? (
             <div className="flex-1 flex items-center justify-center overflow-hidden">
-              <svg 
-                width="100%" 
-                height="100%" 
-                viewBox="0 0 500 500" 
+              <svg
+                key={currentLevel?.path || 'root'}
+                width="100%"
+                height="100%"
+                viewBox="0 0 500 500"
                 className="max-h-full transition-all duration-500 ease-in-out"
-                style={{ 
+                style={{
                   opacity: 1,
                   transform: 'scale(1)'
                 }}
@@ -573,7 +584,7 @@ function AnalyzeContent() {
                                       cursor: 'pointer',
                                       transition: 'opacity 0.2s ease',
                                       opacity: activePath !== null && activePath !== item.path ? 0.3 : 1,
-                                      animation: `fadeIn 0.4s ease-out ${layerIndex * 0.1}s forwards`
+                                      animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                     }}
                                     onClick={() => {
                                       if (item.node.isDirectory && item.node.children) {
@@ -634,7 +645,7 @@ Size: ${formatBytes(item.value)}`}</title>
                                   cursor: 'pointer',
                                   transition: 'opacity 0.2s ease',
                                   opacity: activePath !== null && activePath !== item.path ? 0.3 : 1,
-                                  animation: `fadeIn 0.4s ease-out ${layerIndex * 0.1}s forwards`
+                                  animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                 }}
                                 onClick={() => {
                                   if (item.node.isDirectory && item.node.children) {
