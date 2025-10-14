@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { PieChart, Pie, Cell, ResponsiveContainer, Sector, Tooltip } from 'recharts'
+import { Sector } from 'recharts'
 import { ArrowLeft, Loader2, Folder, File } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -20,12 +20,15 @@ interface ChartData {
   color: string
   path: string
   node: FileNode
+  startAngle?: number
+  endAngle?: number
 }
 
 interface LayerData {
   data: ChartData[]
   innerRadius: number
   outerRadius: number
+  depth: number
 }
 
 const COLORS = [
@@ -64,12 +67,6 @@ function AnalyzeContent() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    if (path) {
-      scanFolder(path)
-    }
-  }, [path])
-
   const scanFolder = async (folderPath: string) => {
     try {
       setIsLoading(true)
@@ -84,89 +81,131 @@ function AnalyzeContent() {
     }
   }
 
-  const handlePieClick = (entry: ChartData, index: number) => {
-    if (!currentLevel || !currentLevel.children) return
-
-    const clickedNode = currentLevel.children.find(child => child.path === entry.path)
-    if (clickedNode && clickedNode.isDirectory && clickedNode.children) {
-      setCurrentLevel(clickedNode)
-      setBreadcrumb([...breadcrumb, clickedNode])
-      setActiveIndex(null)
+  useEffect(() => {
+    if (path) {
+      scanFolder(path)
     }
-  }
+  }, [path])
 
+  // Helper functions must be defined before use
   const prepareMultiLayerData = (rootNode: FileNode | null, maxDepth: number = 4): LayerData[] => {
     if (!rootNode || !rootNode.children) return []
 
-    const layers: LayerData[] = []
+    const layers: Map<number, ChartData[]> = new Map()
     const layerThickness = 40
 
-    // Helper to collect nodes with parent context for coloring
-    const collectNodesAtDepth = (
+    // Build hierarchical data with angle calculations
+    const buildHierarchy = (
       nodes: FileNode[],
-      currentDepth: number,
-      targetDepth: number,
-      parentColorIndex: number = 0,
-      parentPath: string = ''
-    ): ChartData[] => {
-      if (currentDepth === targetDepth) {
-        return nodes
-          .filter(node => node.size > 0)
-          .sort((a, b) => b.size - a.size)
-          .map((node, idx) => {
-            // Use parent's color scheme, with depth-based shade variation
-            const colorScheme = COLOR_SCHEMES[parentColorIndex % COLOR_SCHEMES.length]
-            const color = colorScheme[Math.min(currentDepth, colorScheme.length - 1)]
+      depth: number,
+      startAngle: number,
+      endAngle: number,
+      parentColorIndex: number
+    ) => {
+      if (depth >= maxDepth || !nodes || nodes.length === 0) return
 
-            return {
-              name: node.name,
-              value: node.size,
-              color: color,
-              path: node.path,
-              node: node,
-            }
-          })
-      }
+      const sortedNodes = nodes
+        .filter(node => node.size > 0)
+        .sort((a, b) => b.size - a.size)
 
-      if (currentDepth > targetDepth) return []
+      const totalSize = sortedNodes.reduce((sum, node) => sum + node.size, 0)
+      let currentAngle = startAngle
+      const angleRange = endAngle - startAngle
 
-      const result: ChartData[] = []
-      nodes.forEach((node, idx) => {
-        if (node.isDirectory && node.children) {
-          // Each sibling folder gets its own color scheme
-          const childColorIndex = parentPath === '' ? idx : parentColorIndex
+      sortedNodes.forEach((node) => {
+        const proportion = node.size / totalSize
+        const nodeAngleRange = angleRange * proportion
+        const nodeEndAngle = currentAngle + nodeAngleRange
 
-          const childData = collectNodesAtDepth(
-            node.children,
-            currentDepth + 1,
-            targetDepth,
-            childColorIndex,
-            node.path
-          )
-          result.push(...childData)
+        // Get color for this node
+        const colorScheme = COLOR_SCHEMES[parentColorIndex % COLOR_SCHEMES.length]
+        const color = colorScheme[Math.min(depth, colorScheme.length - 1)]
+
+        // Add to current layer
+        if (!layers.has(depth)) {
+          layers.set(depth, [])
         }
-      })
 
-      return result
+        layers.get(depth)!.push({
+          name: node.name,
+          value: node.size,
+          color: color,
+          path: node.path,
+          node: node,
+          startAngle: currentAngle,
+          endAngle: nodeEndAngle,
+        })
+
+        // Process children recursively
+        if (node.isDirectory && node.children && node.children.length > 0 && depth < maxDepth - 1) {
+          buildHierarchy(
+            node.children,
+            depth + 1,
+            currentAngle,
+            nodeEndAngle,
+            parentColorIndex
+          )
+        }
+
+        currentAngle = nodeEndAngle
+      })
     }
 
-    // Build layers from inside (depth 0) to outside (depth maxDepth)
-    for (let depth = 0; depth < maxDepth; depth++) {
-      const layerData = collectNodesAtDepth(rootNode.children, 0, depth, 0, '')
+    // Process root level - each top-level folder gets its own color scheme
+    if (rootNode.children) {
+      const sortedRootChildren = rootNode.children
+        .filter(node => node.size > 0)
+        .sort((a, b) => b.size - a.size)
 
-      if (layerData.length === 0) break
+      const totalSize = sortedRootChildren.reduce((sum, node) => sum + node.size, 0)
+      let currentAngle = 0
 
+      sortedRootChildren.forEach((node, index) => {
+        const proportion = node.size / totalSize
+        const nodeAngleRange = 360 * proportion
+        const nodeEndAngle = currentAngle + nodeAngleRange
+
+        const colorScheme = COLOR_SCHEMES[index % COLOR_SCHEMES.length]
+        const color = colorScheme[0]
+
+        if (!layers.has(0)) {
+          layers.set(0, [])
+        }
+
+        layers.get(0)!.push({
+          name: node.name,
+          value: node.size,
+          color: color,
+          path: node.path,
+          node: node,
+          startAngle: currentAngle,
+          endAngle: nodeEndAngle,
+        })
+
+        // Process children
+        if (node.isDirectory && node.children && node.children.length > 0) {
+          buildHierarchy(node.children, 1, currentAngle, nodeEndAngle, index)
+        }
+
+        currentAngle = nodeEndAngle
+      })
+    }
+
+    // Convert map to array of layers
+    const result: LayerData[] = []
+    layers.forEach((data, depth) => {
       const innerRadius = 60 + (depth * layerThickness)
       const outerRadius = innerRadius + layerThickness - 3
 
-      layers.push({
-        data: layerData,
+      result.push({
+        data,
         innerRadius,
         outerRadius,
+        depth,
       })
-    }
+    })
 
-    return layers
+    return result.sort((a, b) => a.depth - b.depth)
   }
 
   const prepareChartData = (node: FileNode | null): ChartData[] => {
@@ -183,6 +222,35 @@ function AnalyzeContent() {
         path: child.path,
         node: child,
       }))
+  }
+
+  // Prepare data (must be before conditional returns)
+  const layers = prepareMultiLayerData(currentLevel)
+  const chartData = prepareChartData(currentLevel)
+  const totalSize = currentLevel?.size || 0
+
+  // Debug output - must be called on every render
+  useEffect(() => {
+    if (layers.length > 0) {
+      console.log('=== Layer Data ===')
+      layers.forEach((layer, idx) => {
+        console.log(`Layer ${idx} (depth ${layer.depth}):`)
+        layer.data.forEach(item => {
+          console.log(`  - ${item.name}: ${formatBytes(item.value)} [${item.startAngle?.toFixed(1)}° - ${item.endAngle?.toFixed(1)}°] (${((item.endAngle! - item.startAngle!)).toFixed(1)}°)`)
+        })
+      })
+    }
+  }, [layers.length, currentLevel?.path])
+
+  const handlePieClick = (entry: ChartData, index: number) => {
+    if (!currentLevel || !currentLevel.children) return
+
+    const clickedNode = currentLevel.children.find(child => child.path === entry.path)
+    if (clickedNode && clickedNode.isDirectory && clickedNode.children) {
+      setCurrentLevel(clickedNode)
+      setBreadcrumb([...breadcrumb, clickedNode])
+      setActiveIndex(null)
+    }
   }
 
   const renderActiveShape = (props: any) => {
@@ -222,11 +290,6 @@ function AnalyzeContent() {
     )
   }
 
-  // Redraw chart based on current level
-  const layers = prepareMultiLayerData(currentLevel)
-  const chartData = prepareChartData(currentLevel)
-  const totalSize = currentLevel?.size || 0
-
   const handleGoBack = () => {
     if (breadcrumb.length > 1) {
       const newBreadcrumb = breadcrumb.slice(0, -1)
@@ -236,37 +299,6 @@ function AnalyzeContent() {
     }
   }
 
-  // Custom tooltip for pie chart
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload
-      const isDirectory = data.node?.isDirectory
-
-      return (
-        <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-sm">
-          <div className="flex items-center gap-2 mb-2">
-            {isDirectory ? (
-              <Folder className="w-4 h-4 text-primary" />
-            ) : (
-              <File className="w-4 h-4 text-muted-foreground" />
-            )}
-            <span className="font-medium text-foreground">
-              {isDirectory ? 'Folder' : 'File'}
-            </span>
-          </div>
-          <div className="space-y-1">
-            <div className="text-foreground font-medium truncate max-w-[200px]">
-              {data.name}
-            </div>
-            <div className="text-muted-foreground">
-              Size: <span className="font-medium text-foreground">{formatBytes(data.value)}</span>
-            </div>
-          </div>
-        </div>
-      )
-    }
-    return null
-  }
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -308,40 +340,103 @@ function AnalyzeContent() {
           </div>
         </div>
 
+        {/* Debug Info */}
+        <div className="bg-card rounded-lg border border-border p-4">
+          <details className="cursor-pointer">
+            <summary className="text-sm font-medium text-muted-foreground">Debug Info (Click to expand)</summary>
+            <div className="mt-3 space-y-2 text-xs font-mono">
+              {layers.map((layer, idx) => (
+                <div key={idx} className="border-l-2 border-primary pl-3">
+                  <div className="font-bold text-foreground">Layer {idx} (Depth {layer.depth}):</div>
+                  {layer.data.map((item, itemIdx) => (
+                    <div key={itemIdx} className="ml-2 text-muted-foreground">
+                      • {item.name}: {formatBytes(item.value)}
+                      <span className="text-primary ml-2">
+                        [{item.startAngle?.toFixed(1)}° → {item.endAngle?.toFixed(1)}°]
+                      </span>
+                      <span className="text-secondary ml-1">
+                        ({((item.endAngle! - item.startAngle!)).toFixed(1)}°)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
+
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="bg-card rounded-lg border border-border p-6">
             <h2 className="text-lg font-semibold mb-4 text-foreground">Nested Storage Distribution</h2>
             {layers.length > 0 ? (
               <div className="relative">
                 <div className="relative z-10">
-                  <ResponsiveContainer width="100%" height={500}>
-                    <PieChart>
-                      <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 1000 }} />
-                      {layers.map((layer, layerIndex) => (
-                        <Pie
-                          key={`layer-${layerIndex}`}
-                          data={layer.data}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={layer.innerRadius}
-                          outerRadius={layer.outerRadius}
-                          paddingAngle={1}
-                          dataKey="value"
-                          onClick={(entry) => {
-                            if (entry.node.isDirectory && entry.node.children) {
-                              setCurrentLevel(entry.node)
-                              setBreadcrumb([...breadcrumb, entry.node])
-                            }
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          {layer.data.map((entry, index) => (
-                            <Cell key={`cell-${layerIndex}-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                      ))}
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <svg width="100%" height={500} viewBox="0 0 500 500">
+                    {layers.map((layer, layerIndex) => {
+                      const centerX = 250
+                      const centerY = 250
+
+                      return (
+                        <g key={`layer-${layerIndex}`}>
+                          {layer.data.map((item, index) => {
+                            const startAngle = (item.startAngle || 0) - 90
+                            const endAngle = (item.endAngle || 0) - 90
+                            const startRad = (startAngle * Math.PI) / 180
+                            const endRad = (endAngle * Math.PI) / 180
+
+                            const x1 = centerX + layer.innerRadius * Math.cos(startRad)
+                            const y1 = centerY + layer.innerRadius * Math.sin(startRad)
+                            const x2 = centerX + layer.outerRadius * Math.cos(startRad)
+                            const y2 = centerY + layer.outerRadius * Math.sin(startRad)
+                            const x3 = centerX + layer.outerRadius * Math.cos(endRad)
+                            const y3 = centerY + layer.outerRadius * Math.sin(endRad)
+                            const x4 = centerX + layer.innerRadius * Math.cos(endRad)
+                            const y4 = centerY + layer.innerRadius * Math.sin(endRad)
+
+                            const largeArc = endAngle - startAngle > 180 ? 1 : 0
+
+                            const pathData = [
+                              `M ${x1} ${y1}`,
+                              `L ${x2} ${y2}`,
+                              `A ${layer.outerRadius} ${layer.outerRadius} 0 ${largeArc} 1 ${x3} ${y3}`,
+                              `L ${x4} ${y4}`,
+                              `A ${layer.innerRadius} ${layer.innerRadius} 0 ${largeArc} 0 ${x1} ${y1}`,
+                              'Z'
+                            ].join(' ')
+
+                            return (
+                              <path
+                                key={`sector-${layerIndex}-${index}`}
+                                d={pathData}
+                                fill={item.color}
+                                stroke="rgba(0,0,0,0.1)"
+                                strokeWidth={0.5}
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => {
+                                  if (item.node.isDirectory && item.node.children) {
+                                    setCurrentLevel(item.node)
+                                    setBreadcrumb([...breadcrumb, item.node])
+                                  }
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.opacity = '0.8'
+                                  setActiveIndex(index)
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.opacity = '1'
+                                  setActiveIndex(null)
+                                }}
+                              >
+                                <title>
+                                  {item.node.isDirectory ? '📁 Folder' : '📄 File'}: {item.name} - {formatBytes(item.value)}
+                                </title>
+                              </path>
+                            )
+                          })}
+                        </g>
+                      )
+                    })}
+                  </svg>
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                   <div className="text-center">
