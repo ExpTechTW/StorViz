@@ -37,7 +37,8 @@
           "permissions": [
             "dialog:allow-open",
             "core:default",
-            "shell:default"
+            "shell:default",
+            "shell:allow-open"
           ]
         }
       ]

@@ -34,7 +34,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-8">
+    <div className="min-h-screen flex items-center justify-center p-8">
       <div className="max-w-2xl w-full space-y-8">
         <div className="text-center space-y-4">
           <div className="flex justify-center">
