@@ -70,41 +70,65 @@ function AnalyzeContent() {
   const [scanProgress, setScanProgress] = useState<{ currentPath: string; filesScanned: number; scannedSize: number; estimatedTotal: number } | null>(null)
   const [diskInfo, setDiskInfo] = useState<{ totalSpace: number; availableSpace: number; usedSpace: number } | null>(null)
 
-  const scanFolder = async (folderPath: string) => {
-    try {
-      setIsLoading(true)
-      setScanProgress({ currentPath: folderPath, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
+  useEffect(() => {
+    if (!path) return
 
-      // Start listening BEFORE invoking the command
-      const unlisten = await listen<{ current_path: string; files_scanned: number; scanned_size: number; estimated_total: number }>('scan-progress', (event) => {
-        setScanProgress({
-          currentPath: event.payload.current_path,
-          filesScanned: event.payload.files_scanned,
-          scannedSize: event.payload.scanned_size,
-          estimatedTotal: event.payload.estimated_total
-        })
-      })
+    // Generate event ID using seconds timestamp
+    const eventId = Math.floor(Date.now() / 1000).toString()
+    console.log('[DEBUG] useEffect 觸發, eventId:', eventId)
 
+    let unlistenFn: (() => void) | null = null
+
+    const scanFolder = async () => {
       try {
-        const result = await invoke<{ node: FileNode; diskInfo?: { totalSpace: number; availableSpace: number; usedSpace: number } }>('scan_directory', { path: folderPath })
+        console.log('[DEBUG] 開始掃描, setIsLoading(true)')
+        setIsLoading(true)
+        setScanProgress({ currentPath: path, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
+
+        const unlisten = await listen<{ current_path: string; files_scanned: number; scanned_size: number; estimated_total: number }>('scan-progress', (event) => {
+          setScanProgress({
+            currentPath: event.payload.current_path,
+            filesScanned: event.payload.files_scanned,
+            scannedSize: event.payload.scanned_size,
+            estimatedTotal: event.payload.estimated_total
+          })
+        })
+        unlistenFn = unlisten
+
+        console.log('[DEBUG] 開始調用 scan_directory, eventId:', eventId)
+        const result = await invoke<{ node: FileNode; diskInfo?: { totalSpace: number; availableSpace: number; usedSpace: number } }>('scan_directory', { path, eventId })
+
+        console.log('[DEBUG] scan_directory 返回')
+        console.log('[DEBUG] result:', result)
+        console.log('[DEBUG] result.node:', result.node)
+        console.log('[DEBUG] result.diskInfo:', result.diskInfo)
+
+        console.log('[DEBUG] 設置資料, setIsLoading(false)')
         setData(result.node)
         setCurrentLevel(result.node)
         setBreadcrumb([result.node])
         setDiskInfo(result.diskInfo || null)
+        setIsLoading(false)
+        setScanProgress(null)
+      } catch (error) {
+        console.log('[DEBUG] scan_directory 錯誤:', error)
+        // Backend handles deduplication, silently ignore duplicate scan errors
       } finally {
-        unlisten()
+        console.log('[DEBUG] finally 區塊, unlisten')
+        if (unlistenFn) {
+          unlistenFn()
+        }
       }
-    } catch (error) {
-      console.error('掃描資料夾時發生錯誤:', error)
-    } finally {
-      setIsLoading(false)
-      setScanProgress(null)
     }
-  }
 
-  useEffect(() => {
-    if (path) {
-      scanFolder(path)
+    scanFolder()
+
+    // Cleanup function - only unlisten, don't cancel state updates
+    return () => {
+      console.log('[DEBUG] cleanup 函數執行')
+      if (unlistenFn) {
+        unlistenFn()
+      }
     }
   }, [path])
 
@@ -181,6 +205,7 @@ function AnalyzeContent() {
       // Check if we're at disk root and need to add available space
       const isDiskRoot = diskInfo !== null
       const scannedSize = sortedRootChildren.reduce((sum, node) => sum + node.size, 0)
+
 
       // For disk root, total = scanned + available space
       // For folders, total = scanned only

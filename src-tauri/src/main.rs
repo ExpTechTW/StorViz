@@ -2,11 +2,20 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use sysinfo::Disks;
+
+// Global map to track recent event IDs (path -> Vec<event_id>)
+// Keep only the last 5 event IDs for each path
+lazy_static::lazy_static! {
+    static ref RECENT_EVENTS: Mutex<HashMap<String, Vec<String>>> = Mutex::new(HashMap::new());
+}
+
+const MAX_EVENT_IDS: usize = 5; // Keep last 5 event IDs
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FileNode {
@@ -21,6 +30,7 @@ struct FileNode {
 #[derive(Clone, Serialize)]
 struct ScanResult {
     node: FileNode,
+    #[serde(rename = "diskInfo")]
     disk_info: Option<DiskInfo>,
 }
 
@@ -34,13 +44,34 @@ struct ScanProgress {
 
 #[derive(Clone, Serialize)]
 struct DiskInfo {
+    #[serde(rename = "totalSpace")]
     total_space: u64,
+    #[serde(rename = "availableSpace")]
     available_space: u64,
+    #[serde(rename = "usedSpace")]
     used_space: u64,
 }
 
 #[tauri::command]
-fn scan_directory(path: String, app_handle: tauri::AppHandle) -> Result<ScanResult, String> {
+fn scan_directory(path: String, event_id: String, app_handle: tauri::AppHandle) -> Result<ScanResult, String> {
+    // Check for duplicate event ID
+    {
+        let mut recent_events = RECENT_EVENTS.lock().unwrap();
+
+        if let Some(event_ids) = recent_events.get(&path) {
+            if event_ids.contains(&event_id) {
+                return Err("重複的掃描請求".to_string());
+            }
+        }
+
+        // Add current event ID and keep only last MAX_EVENT_IDS
+        let event_ids = recent_events.entry(path.clone()).or_insert_with(Vec::new);
+        event_ids.push(event_id);
+        if event_ids.len() > MAX_EVENT_IDS {
+            event_ids.drain(0..(event_ids.len() - MAX_EVENT_IDS));
+        }
+    }
+
     let root_path = Path::new(&path);
 
     if !root_path.exists() {
@@ -86,6 +117,7 @@ fn scan_directory(path: String, app_handle: tauri::AppHandle) -> Result<ScanResu
 
     let counter = Arc::new(Mutex::new(0u64));
     let scanned_size = Arc::new(Mutex::new(0u64));
+
     let node = scan_dir_recursive(root_path, &app_handle, counter, scanned_size, estimated_total)?;
 
     Ok(ScanResult {

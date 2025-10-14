@@ -8,7 +8,9 @@
       "Bash(cargo --version)",
       "Bash(curl:*)",
       "Bash(tree:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(cargo:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []
