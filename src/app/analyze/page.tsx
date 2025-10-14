@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Sector } from 'recharts'
 import { ArrowLeft, Loader2, Folder, File } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
 interface FileNode {
   name: string
@@ -66,18 +67,38 @@ function AnalyzeContent() {
   const [breadcrumb, setBreadcrumb] = useState<FileNode[]>([])
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [scanProgress, setScanProgress] = useState<{ currentPath: string; filesScanned: number; scannedSize: number; estimatedTotal: number } | null>(null)
+  const [diskInfo, setDiskInfo] = useState<{ totalSpace: number; availableSpace: number; usedSpace: number } | null>(null)
 
   const scanFolder = async (folderPath: string) => {
     try {
       setIsLoading(true)
-      const result = await invoke<FileNode>('scan_directory', { path: folderPath })
-      setData(result)
-      setCurrentLevel(result)
-      setBreadcrumb([result])
+      setScanProgress({ currentPath: folderPath, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
+
+      // Start listening BEFORE invoking the command
+      const unlisten = await listen<{ current_path: string; files_scanned: number; scanned_size: number; estimated_total: number }>('scan-progress', (event) => {
+        setScanProgress({
+          currentPath: event.payload.current_path,
+          filesScanned: event.payload.files_scanned,
+          scannedSize: event.payload.scanned_size,
+          estimatedTotal: event.payload.estimated_total
+        })
+      })
+
+      try {
+        const result = await invoke<{ node: FileNode; diskInfo?: { totalSpace: number; availableSpace: number; usedSpace: number } }>('scan_directory', { path: folderPath })
+        setData(result.node)
+        setCurrentLevel(result.node)
+        setBreadcrumb([result.node])
+        setDiskInfo(result.diskInfo || null)
+      } finally {
+        unlisten()
+      }
     } catch (error) {
       console.error('掃描資料夾時發生錯誤:', error)
     } finally {
       setIsLoading(false)
+      setScanProgress(null)
     }
   }
 
@@ -157,7 +178,13 @@ function AnalyzeContent() {
         .filter(node => node.size > 0)
         .sort((a, b) => b.size - a.size)
 
-      const totalSize = sortedRootChildren.reduce((sum, node) => sum + node.size, 0)
+      // Check if we're at disk root and need to add available space
+      const isDiskRoot = diskInfo !== null
+      const scannedSize = sortedRootChildren.reduce((sum, node) => sum + node.size, 0)
+
+      // For disk root, total = scanned + available space
+      // For folders, total = scanned only
+      const totalSize = isDiskRoot ? scannedSize + diskInfo.availableSpace : scannedSize
       let currentAngle = 0
 
       sortedRootChildren.forEach((node, index) => {
@@ -189,6 +216,32 @@ function AnalyzeContent() {
 
         currentAngle = nodeEndAngle
       })
+
+      // Add available space for disk root
+      if (isDiskRoot && diskInfo.availableSpace > 0) {
+        if (!layers.has(0)) {
+          layers.set(0, [])
+        }
+
+        const availableProportion = diskInfo.availableSpace / totalSize
+        const availableAngleRange = 360 * availableProportion
+        const availableEndAngle = currentAngle + availableAngleRange
+
+        layers.get(0)!.push({
+          name: '可用空間',
+          value: diskInfo.availableSpace,
+          color: 'rgba(200, 200, 200, 0.3)', // Transparent gray
+          path: '',
+          node: {
+            name: '可用空間',
+            size: diskInfo.availableSpace,
+            path: '',
+            isDirectory: false
+          },
+          startAngle: currentAngle,
+          endAngle: availableEndAngle,
+        })
+      }
     }
 
     // Convert map to array of layers
@@ -281,10 +334,60 @@ function AnalyzeContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground">正在掃描資料夾...</p>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl space-y-6">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-lg font-medium text-foreground">正在掃描資料夾</p>
+          </div>
+
+          {scanProgress && scanProgress.filesScanned > 0 && (
+            <div className="bg-card rounded-lg border border-border p-6 space-y-4">
+              {/* Progress bar - only show if we have estimated total (disk root) */}
+              {scanProgress.estimatedTotal > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-sm mb-2">
+                    <span className="text-muted-foreground">掃描進度</span>
+                    <span className="font-mono text-primary font-semibold">
+                      {Math.min(100, Math.round((scanProgress.scannedSize / scanProgress.estimatedTotal) * 100))}%
+                    </span>
+                  </div>
+                  <div className="h-3 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+                      style={{
+                        width: `${Math.min(100, (scanProgress.scannedSize / scanProgress.estimatedTotal) * 100)}%`
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">已掃描項目</p>
+                  <p className="text-2xl font-bold text-foreground font-mono">
+                    {scanProgress.filesScanned.toLocaleString()}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">已掃描大小</p>
+                  <p className="text-2xl font-bold text-foreground font-mono">
+                    {formatBytes(scanProgress.scannedSize)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Current path */}
+              <div className="pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground mb-1">當前路徑</p>
+                <p className="text-sm text-foreground font-mono truncate" title={scanProgress.currentPath}>
+                  {scanProgress.currentPath}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     )
