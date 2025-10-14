@@ -1,6 +1,6 @@
 {
   "productName": "StorViz",
-  "version": "0.1.0",
+  "version": "1.0.0-pre.1",
   "identifier": "com.storviz.app",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -10,6 +10,9 @@
   },
   "bundle": {
     "active": true,
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
