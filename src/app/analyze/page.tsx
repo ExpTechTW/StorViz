@@ -202,10 +202,10 @@ function AnalyzeContent() {
         .filter(node => node.size > 0)
         .sort((a, b) => b.size - a.size)
 
-      // Check if we're at disk root and need to add available space
-      const isDiskRoot = diskInfo !== null
+      // Check if we're at disk root (comparing with the initial scanned data node)
+      // Only show available space if viewing the root node that was initially scanned
+      const isDiskRoot = diskInfo !== null && rootNode === data
       const scannedSize = sortedRootChildren.reduce((sum, node) => sum + node.size, 0)
-
 
       // For disk root, total = scanned + available space
       // For folders, total = scanned only
@@ -305,7 +305,6 @@ function AnalyzeContent() {
   // Prepare data (must be before conditional returns)
   const layers = prepareMultiLayerData(currentLevel)
   const chartData = prepareChartData(currentLevel)
-  const totalSize = currentLevel?.size || 0
 
   // Debug output - must be called on every render
   useEffect(() => {
@@ -498,7 +497,7 @@ function AnalyzeContent() {
             <h2 className="text-lg font-semibold mb-4 text-foreground">Nested Storage Distribution</h2>
             {layers.length > 0 ? (
               <div className="relative">
-                <div className="relative z-10">
+                <div className="relative z-0">
                   <svg width="100%" height={500} viewBox="0 0 500 500">
                     {layers.map((layer, layerIndex) => {
                       const centerX = 250
@@ -513,20 +512,6 @@ function AnalyzeContent() {
                             if (Math.abs(angleRange - 360) < 0.01) {
                               return (
                                 <g key={`sector-${layerIndex}-${index}`}>
-                                  <circle
-                                    cx={centerX}
-                                    cy={centerY}
-                                    r={layer.outerRadius}
-                                    fill={item.color}
-                                    stroke="rgba(0,0,0,0.1)"
-                                    strokeWidth={0.5}
-                                  />
-                                  <circle
-                                    cx={centerX}
-                                    cy={centerY}
-                                    r={layer.innerRadius}
-                                    fill="white"
-                                  />
                                   <circle
                                     cx={centerX}
                                     cy={centerY}
@@ -617,12 +602,14 @@ function AnalyzeContent() {
                     })}
                   </svg>
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-foreground">
-                      {formatBytes(totalSize)}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                  <div className="text-center max-w-[120px]">
+                    <div className="text-xl font-bold text-foreground break-words">
+                      {formatBytes(currentLevel?.size || 0)}
                     </div>
-                    <div className="text-sm text-muted-foreground">Total Size</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {currentLevel?.name || 'Total'}
+                    </div>
                   </div>
                 </div>
               </div>
