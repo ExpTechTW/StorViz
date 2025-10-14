@@ -14,13 +14,24 @@
   "app": {
     "windows": [
       {
-        "title": "StorViz - 儲存空間視覺化分析",
+        "title": "StorViz - Storage Visualization",
         "width": 1200,
         "height": 800
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "windows": ["*"],
+          "permissions": [
+            "dialog:allow-open",
+            "core:default",
+            "shell:default"
+          ]
+        }
+      ]
     }
   }
 }
