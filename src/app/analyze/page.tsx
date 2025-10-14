@@ -63,11 +63,13 @@ function formatBytesCompact(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   const value = bytes / Math.pow(k, i)
 
-  // Max 4 digits total (or 2 integer digits + 2 decimals)
-  if (value >= 100) {
+  // Always show 4 digits total (with decimals to fill)
+  if (value >= 1000) {
     return `${Math.round(value)} ${sizes[i]}`
-  } else if (value >= 10) {
+  } else if (value >= 100) {
     return `${value.toFixed(1)} ${sizes[i]}`
+  } else if (value >= 10) {
+    return `${value.toFixed(2)} ${sizes[i]}`
   } else {
     return `${value.toFixed(2)} ${sizes[i]}`
   }
@@ -504,18 +506,40 @@ function AnalyzeContent() {
               <span className="w-0.5 h-3 bg-primary rounded-full"></span>
               Storage Distribution
             </h2>
-            <div className="text-right">
-              <div className="text-xs font-bold text-foreground">
-                {formatBytesCompact(currentLevel?.size || 0)}
-              </div>
-              <div className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-                {currentLevel?.name || 'Total'}
-              </div>
+            <div className={`text-xs font-bold truncate max-w-[200px] ${currentLevel === data ? 'text-primary' : 'text-foreground'}`}>
+              {currentLevel === data && diskInfo ? (
+                <span className="flex items-center gap-1">
+                  💾 {currentLevel?.name || path?.split('\\').pop() || path?.split('/').pop() || 'Disk'}
+                </span>
+              ) : (
+                currentLevel?.name || 'Total'
+              )}
             </div>
           </div>
           {layers.length > 0 ? (
             <div className="flex-1 flex items-center justify-center overflow-hidden">
               <svg width="100%" height="100%" viewBox="0 0 500 500" className="max-h-full">
+                    {/* Center size display */}
+                    <text
+                      x="250"
+                      y="245"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      className="fill-foreground"
+                      style={{ fontSize: '18px', fontWeight: 'bold' }}
+                    >
+                      {formatBytesCompact(currentLevel?.size || 0).split(' ')[0]}
+                    </text>
+                    <text
+                      x="250"
+                      y="265"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      className="fill-muted-foreground"
+                      style={{ fontSize: '14px', fontWeight: '500' }}
+                    >
+                      {formatBytesCompact(currentLevel?.size || 0).split(' ')[1]}
+                    </text>
                     {layers.map((layer, layerIndex) => {
                       const centerX = 250
                       const centerY = 250
