@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { invoke, Channel } from '@tauri-apps/api/core'
+import { getFileTypeInfo } from '@/lib/fileTypeUtils'
 
 interface FileNode {
   name: string
@@ -84,66 +85,6 @@ function formatBytesCompact(bytes: number): string {
   } else {
     return `${value.toFixed(2)} ${sizes[i]}`
   }
-}
-
-interface FileTypeInfo {
-  icon: string
-  label: string
-}
-
-function getFileTypeInfo(fileName: string, isDirectory: boolean): FileTypeInfo {
-  if (isDirectory) {
-    return { icon: '📁', label: 'Folder' }
-  }
-
-  const ext = fileName.split('.').pop()?.toLowerCase() || ''
-
-  // 圖片
-  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'].includes(ext)) {
-    return { icon: '🖼️', label: 'Image' }
-  }
-  // 影片
-  if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v'].includes(ext)) {
-    return { icon: '🎬', label: 'Video' }
-  }
-  // 音訊
-  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a'].includes(ext)) {
-    return { icon: '🎵', label: 'Audio' }
-  }
-  // 壓縮檔
-  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso'].includes(ext)) {
-    return { icon: '📦', label: 'Archive' }
-  }
-  // 程式碼
-  if (['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'c', 'cpp', 'cs', 'go', 'rs', 'php', 'rb', 'swift', 'kt'].includes(ext)) {
-    return { icon: '💻', label: 'Code' }
-  }
-  // 網頁
-  if (['html', 'htm', 'css', 'scss', 'sass', 'less'].includes(ext)) {
-    return { icon: '🌐', label: 'Web' }
-  }
-  // 文件
-  if (['txt', 'md', 'doc', 'docx', 'pdf', 'rtf'].includes(ext)) {
-    return { icon: '📄', label: 'Document' }
-  }
-  // 試算表
-  if (['xls', 'xlsx', 'csv'].includes(ext)) {
-    return { icon: '📊', label: 'Spreadsheet' }
-  }
-  // 資料庫
-  if (['db', 'sqlite', 'sql', 'mdb'].includes(ext)) {
-    return { icon: '🗄️', label: 'Database' }
-  }
-  // 設定檔
-  if (['json', 'yaml', 'yml', 'toml', 'ini', 'conf', 'config'].includes(ext)) {
-    return { icon: '⚙️', label: 'Config' }
-  }
-  // 執行檔
-  if (['exe', 'msi', 'app', 'dmg', 'deb', 'rpm'].includes(ext)) {
-    return { icon: '⚡', label: 'Executable' }
-  }
-
-  return { icon: '📄', label: 'File' }
 }
 
 function AnalyzeContent() {
@@ -854,6 +795,9 @@ function AnalyzeContent() {
           >
             {chartData.map((item) => {
               const sectorId = generateSectorId(item.path, 0)
+              const fileTypeInfo = getFileTypeInfo(item.name, item.node.isDirectory)
+              const IconComponent = fileTypeInfo.icon
+
               return (
               <div
                 key={item.path}
@@ -861,20 +805,21 @@ function AnalyzeContent() {
                 data-sector-id={sectorId}
                 onMouseEnter={() => handleHover(sectorId)}
                 onClick={() => handlePieClick(item)}
-                title={item.name === '可用空間' 
+                title={item.name === '可用空間'
                   ? `💾 可用空間 - ${formatBytes(item.value)}${diskInfo ? `\n總容量: ${formatBytes(diskInfo.totalSpace)}` : ''}`
-                  : `${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${item.name} - ${formatBytes(item.value)}`
+                  : `${fileTypeInfo.label} - ${item.name} - ${formatBytes(item.value)}`
                 }
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-sm flex-shrink-0">
-                    {getFileTypeInfo(item.name, item.node.isDirectory).icon}
-                  </span>
+                  <IconComponent
+                    className="w-5 h-5 flex-shrink-0"
+                    style={{ color: fileTypeInfo.color }}
+                  />
                   <div
                     className="w-2 h-2 rounded-full flex-shrink-0"
                     style={{ backgroundColor: item.color }}
                   />
-                  <span className="text-xs text-foreground truncate font-medium">
+                  <span className="text-sm text-foreground truncate font-medium">
                     {item.name}
                   </span>
                 </div>
