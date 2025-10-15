@@ -429,32 +429,54 @@ function AnalyzeContent() {
   const layers = prepareMultiLayerData(currentLevel)
   const chartData = prepareChartData(currentLevel)
 
+  // Helper function to find a node's parent chain from root
+  const findNodePath = (root: FileNode, targetPath: string): FileNode[] | null => {
+    const normalizedTarget = targetPath.replace(/\\/g, '/')
+    const normalizedRootPath = root.path.replace(/\\/g, '/')
+
+    if (normalizedRootPath === normalizedTarget) {
+      return [root]
+    }
+
+    if (!root.children) return null
+
+    for (const child of root.children) {
+      const normalizedChildPath = child.path.replace(/\\/g, '/')
+      if (normalizedChildPath === normalizedTarget) {
+        return [root, child]
+      }
+
+      const childPath = findNodePath(child, targetPath)
+      if (childPath) {
+        return [root, ...childPath]
+      }
+    }
+
+    return null
+  }
+
   // Helper function to navigate to a node (used by both chart and file list)
   const navigateToNode = (targetNode: FileNode) => {
     if (!targetNode.isDirectory || !targetNode.children) return
 
-    console.log('Navigating to node:', targetNode.path)
-    console.log('Current breadcrumb:', breadcrumb.map(b => b.path))
-
-    // Build path from root to target node
-    const buildPathToNode = (node: FileNode): FileNode[] => {
-      // If node is already in breadcrumb, just navigate to it
-      const existingIndex = breadcrumb.findIndex(b => b.path === node.path)
-      if (existingIndex !== -1) {
-        console.log('Node already in breadcrumb at index:', existingIndex)
-        return breadcrumb.slice(0, existingIndex + 1)
-      }
-
-      // Otherwise, need to build the full path
-      // Start from current breadcrumb and add the new node
-      console.log('Adding new node to breadcrumb')
-      return [...breadcrumb, node]
+    // Check if node is a direct child of current level (most common case)
+    if (currentLevel?.children?.some(child => child.path === targetNode.path)) {
+      setBreadcrumb([...breadcrumb, targetNode])
+      setCurrentLevel(targetNode)
+      return
     }
 
-    const newBreadcrumb = buildPathToNode(targetNode)
-    console.log('New breadcrumb:', newBreadcrumb.map(b => b.path))
-    setBreadcrumb(newBreadcrumb)
-    setCurrentLevel(targetNode)
+    // Otherwise, find the full path from root
+    if (data) {
+      const fullPath = findNodePath(data, targetNode.path)
+      if (fullPath) {
+        setBreadcrumb(fullPath)
+        setCurrentLevel(targetNode)
+      } else {
+        setBreadcrumb([...breadcrumb, targetNode])
+        setCurrentLevel(targetNode)
+      }
+    }
   }
 
   const handlePieClick = (entry: ChartData) => {
@@ -552,32 +574,27 @@ function AnalyzeContent() {
 
   // Handle breadcrumb click
   const handleBreadcrumbClick = (targetPath: string) => {
-    console.log('Breadcrumb clicked, targetPath:', targetPath)
-    console.log('Current breadcrumb:', breadcrumb.map(b => b.path))
-
-    // Normalize the target path
-    const normalizedTargetPath = targetPath.replace(/\\/g, '/')
-
-    // Find the node in breadcrumb that matches the target path
-    const targetNode = breadcrumb.find(node => {
+    // First try to find in current breadcrumb
+    const targetIndex = breadcrumb.findIndex(node => {
       const normalizedNodePath = node.path.replace(/\\/g, '/')
+      const normalizedTargetPath = targetPath.replace(/\\/g, '/')
       return normalizedNodePath === normalizedTargetPath
     })
 
-    console.log('Target node found:', targetNode?.path)
-
-    if (targetNode) {
-      const targetIndex = breadcrumb.findIndex(node => {
-        const normalizedNodePath = node.path.replace(/\\/g, '/')
-        return normalizedNodePath === normalizedTargetPath
-      })
-      console.log('Target index:', targetIndex)
+    if (targetIndex !== -1) {
       const newBreadcrumb = breadcrumb.slice(0, targetIndex + 1)
-      console.log('New breadcrumb:', newBreadcrumb.map(b => b.path))
       setBreadcrumb(newBreadcrumb)
-      setCurrentLevel(targetNode)
-    } else {
-      console.log('Target node NOT found!')
+      setCurrentLevel(breadcrumb[targetIndex])
+      return
+    }
+
+    // If not in breadcrumb, find from root
+    if (data) {
+      const fullPath = findNodePath(data, targetPath)
+      if (fullPath) {
+        setBreadcrumb(fullPath)
+        setCurrentLevel(fullPath[fullPath.length - 1])
+      }
     }
   }
 
