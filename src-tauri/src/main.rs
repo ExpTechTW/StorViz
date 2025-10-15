@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use tauri::ipc::Channel;
 use rayon::prelude::*;
 use sysinfo::Disks;
+#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 use filesize::PathExt;
 
