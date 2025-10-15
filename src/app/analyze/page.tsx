@@ -35,6 +35,18 @@ const COLORS = [
   '#06b6d4', '#6366f1', '#f43f5e', '#84cc16', '#a855f7',
 ]
 
+// Simple hash function to generate unique ID for each sector
+function generateSectorId(path: string, depth: number): string {
+  const str = `${path}-${depth}`
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16)
+}
+
 // Color schemes for each folder - same folder uses same color family
 const COLOR_SCHEMES = [
   ['#1e40af', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'], // Blue
@@ -142,7 +154,6 @@ function AnalyzeContent() {
   const [data, setData] = useState<FileNode | null>(null)
   const [currentLevel, setCurrentLevel] = useState<FileNode | null>(null)
   const [breadcrumb, setBreadcrumb] = useState<FileNode[]>([])
-  const [hoveredPath, setHoveredPath] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [scanProgress, setScanProgress] = useState<{ currentPath: string; filesScanned: number; scannedSize: number; estimatedTotal: number } | null>(null)
   const [diskInfo, setDiskInfo] = useState<{ totalSpace: number; availableSpace: number; usedSpace: number } | null>(null)
@@ -150,31 +161,105 @@ function AnalyzeContent() {
   // Use ref to track component state
   const scanningRef = useRef(false)
 
-  // Hover management - triggered by individual sectors
-  const handleSectorMouseEnter = (path: string) => {
-    setHoveredPath(path)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const pendingHoverRef = useRef<string | null>(null)
+  const rafRef = useRef<number | null>(null)
+
+  // Hover management - directly manipulate CSS
+  const handleSectorMouseEnter = (sectorId: string) => {
+    // Store the sector ID
+    pendingHoverRef.current = sectorId
+
+    // Cancel previous animation frame
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current)
+    }
+
+    // Use requestAnimationFrame to batch updates
+    rafRef.current = requestAnimationFrame(() => {
+      const finalSectorId = pendingHoverRef.current
+      if (!finalSectorId) return
+
+      applySectorHover(finalSectorId)
+      rafRef.current = null
+    })
+  }
+
+  const applySectorHover = (sectorId: string) => {
+    if (!svgRef.current) return
+
+    // Remove all previous hover/dimmed classes
+    const allSectors = svgRef.current.querySelectorAll('.chart-sector')
+    allSectors.forEach(sector => {
+      sector.classList.remove('hovered', 'dimmed')
+    })
+
+    // Add hovered class to the specific sector
+    const hoveredSector = svgRef.current.querySelector(`[data-sector-id="${sectorId}"]`)
+    if (hoveredSector) {
+      hoveredSector.classList.add('hovered')
+    }
+
+    // Add dimmed class to all other sectors
+    allSectors.forEach(sector => {
+      const id = sector.getAttribute('data-sector-id')
+      if (id !== sectorId) {
+        sector.classList.add('dimmed')
+      }
+    })
+
+    // Also handle file list items
+    const fileListContainer = document.querySelector('.file-list')
+    if (fileListContainer) {
+      const allFileItems = fileListContainer.querySelectorAll('.file-item')
+      allFileItems.forEach(item => {
+        const id = item.getAttribute('data-sector-id')
+        if (id === sectorId) {
+          item.classList.add('hovered')
+          item.classList.remove('dimmed')
+        } else {
+          item.classList.add('dimmed')
+          item.classList.remove('hovered')
+        }
+      })
+    }
   }
 
   const handleChartMouseLeave = () => {
-    setHoveredPath(null)
+    if (!svgRef.current) return
+
+    // Remove all hover/dimmed classes
+    const allSectors = svgRef.current.querySelectorAll('.chart-sector')
+    allSectors.forEach(sector => {
+      sector.classList.remove('hovered', 'dimmed')
+    })
+
+    // Also clear file list
+    const fileListContainer = document.querySelector('.file-list')
+    if (fileListContainer) {
+      const allFileItems = fileListContainer.querySelectorAll('.file-item')
+      allFileItems.forEach(item => {
+        item.classList.remove('hovered', 'dimmed')
+      })
+    }
   }
 
   const handleFileListMouseMove = (event: React.MouseEvent) => {
     const target = event.target as HTMLElement
     const fileItem = target.closest('.file-item') as HTMLElement
     if (fileItem) {
-      const path = fileItem.getAttribute('data-path')
-      if (path) {
-        setHoveredPath(path)
+      const sectorId = fileItem.getAttribute('data-sector-id')
+      if (sectorId) {
+        handleSectorMouseEnter(sectorId)
       }
     } else {
       // Clear hover when moving to empty space in file list
-      setHoveredPath(null)
+      handleChartMouseLeave()
     }
   }
 
   const handleFileListMouseLeave = () => {
-    setHoveredPath(null)
+    handleChartMouseLeave()
   }
 
 
@@ -598,17 +683,26 @@ function AnalyzeContent() {
         }
         
         /* JavaScript controlled hover effects */
-        .chart-sector.hovered {
-          filter: brightness(1.1) drop-shadow(0 0 4px rgba(0,0,0,0.2)) !important;
+        .chart-sector {
+          transition: opacity 0.15s ease, filter 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease;
+          filter: none !important;
+          stroke: none !important;
+          stroke-width: 0 !important;
         }
-        
+
+        .chart-sector.hovered {
+          opacity: 1 !important;
+        }
+
         .chart-sector.dimmed {
-          opacity: 0.2 !important;
+          opacity: 0.15 !important;
+          filter: none !important;
+          stroke: none !important;
+          stroke-width: 0 !important;
         }
         
         .file-item.hovered {
-          background-color: rgba(var(--primary-rgb), 0.05) !important;
-          border-color: rgba(var(--primary-rgb), 0.2) !important;
+          background-color: rgba(239, 68, 68, 0.05) !important;
         }
         
         .file-item.dimmed {
@@ -675,6 +769,7 @@ function AnalyzeContent() {
           {layers.length > 0 ? (
             <div className="flex-1 flex items-center justify-center overflow-hidden">
               <svg
+                ref={svgRef}
                 key={currentLevel?.path || 'root'}
                 width="100%"
                 height="100%"
@@ -715,6 +810,7 @@ function AnalyzeContent() {
                         <g key={`layer-${layerIndex}`}>
                           {layer.data.map((item, index) => {
                             const angleRange = (item.endAngle || 0) - (item.startAngle || 0)
+                            const sectorId = generateSectorId(item.path, layer.depth)
 
                             // Special case: full circle (360°)
                             if (Math.abs(angleRange - 360) < 0.01) {
@@ -729,14 +825,14 @@ function AnalyzeContent() {
                                     fill="transparent"
                                     strokeWidth={layer.outerRadius - layer.innerRadius}
                                     stroke={item.color}
-                                    className={`chart-sector ${hoveredPath === item.path ? 'hovered' : ''} ${hoveredPath !== null && hoveredPath !== item.path ? 'dimmed' : ''}`}
-                                    data-path={item.path}
+                                    className="chart-sector"
+                                    data-sector-id={sectorId}
                                     style={{
                                       cursor: 'pointer',
-                                      transition: 'opacity 0.2s ease, filter 0.2s ease',
+                                      transition: 'opacity 0.15s ease, filter 0.15s ease',
                                       animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                     }}
-                                    onMouseEnter={() => handleSectorMouseEnter(item.path)}
+                                    onMouseEnter={() => handleSectorMouseEnter(sectorId)}
                                     onClick={() => {
                                       if (item.node.isDirectory && item.node.children) {
                                         setCurrentLevel(item.node)
@@ -784,14 +880,14 @@ Size: ${formatBytes(item.value)}`}</title>
                                 fill={item.color}
                                 stroke="rgba(0,0,0,0.1)"
                                 strokeWidth={0.5}
-                                className={`chart-sector ${hoveredPath === item.path ? 'hovered' : ''} ${hoveredPath !== null && hoveredPath !== item.path ? 'dimmed' : ''}`}
-                                data-path={item.path}
+                                className="chart-sector"
+                                data-sector-id={sectorId}
                                 style={{
                                   cursor: 'pointer',
-                                  transition: 'opacity 0.2s ease, filter 0.2s ease',
+                                  transition: 'opacity 0.15s ease, filter 0.15s ease',
                                   animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                 }}
-                                onMouseEnter={() => handleSectorMouseEnter(item.path)}
+                                onMouseEnter={() => handleSectorMouseEnter(sectorId)}
                                 onClick={() => {
                                   if (item.node.isDirectory && item.node.children) {
                                     setCurrentLevel(item.node)
@@ -827,11 +923,14 @@ Size: ${formatBytes(item.value)}`}</title>
             onMouseMove={handleFileListMouseMove}
             onMouseLeave={handleFileListMouseLeave}
           >
-            {chartData.map((item, index) => (
+            {chartData.map((item, index) => {
+              const sectorId = generateSectorId(item.path, 0)
+
+              return (
               <div
                 key={item.path}
-                className={`flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent file-item ${hoveredPath === item.path ? 'hovered' : ''} ${hoveredPath !== null && hoveredPath !== item.path ? 'dimmed' : ''}`}
-                data-path={item.path}
+                className="flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent file-item"
+                data-sector-id={sectorId}
                 onClick={() => handlePieClick(item, index)}
                 title={`${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${item.name} - ${formatBytes(item.value)}`}
               >
@@ -851,7 +950,8 @@ Size: ${formatBytes(item.value)}`}</title>
                   {formatBytes(item.value)}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>
