@@ -9,12 +9,13 @@
       "Bash(taskkill:*)",
       "Bash(git restore:*)",
       "Bash(bun run:*)",
-      "Bash(pkill:*)",
-      "Bash(diskutil:*)",
-      "Bash(sudo du:*)",
-      "Read(//Library/**)",
-      "Bash(tmutil listlocalsnapshots:*)",
-      "Bash(/tmp/test_disk_size:*)"
+      "Bash(if [ -d \"D:\\Win64\" ])",
+      "Bash(then echo \"D:\\Win64 exists\")",
+      "Bash(else echo \"D:\\Win64 does NOT exist\")",
+      "Bash(fi)",
+      "Bash(if [ -d \"D:\\TslGame\" ])",
+      "Bash(then echo \"D:\\TslGame exists\")",
+      "Bash(else echo \"D:\\TslGame does NOT exist\")"
     ],
     "deny": [],
     "ask": []

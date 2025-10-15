@@ -23,6 +23,7 @@ interface ChartData {
   node: FileNode
   startAngle?: number
   endAngle?: number
+  isTinyNode?: boolean // True if this node is merged into "其他" in the chart
 }
 
 interface LayerData {
@@ -88,15 +89,254 @@ function formatBytesCompact(bytes: number): string {
   }
 }
 
-// Scale all node sizes by a factor to match df's used_space
-// This accounts for APFS copy-on-write, compression, and deduplication
-function scaleNodeSizes(node: FileNode, scaleFactor: number): FileNode {
-  const scaledNode: FileNode = {
-    ...node,
-    size: Math.round(node.size * scaleFactor),
-    children: node.children?.map(child => scaleNodeSizes(child, scaleFactor))
+// Rebuild tree from root metadata + cached compact nodes
+function rebuildTreeFromCompactNodes(rootNode: FileNode, compactNodes: any[]): FileNode {
+  console.log('[rebuildTreeFromCompactNodes] Starting rebuild')
+  console.log('[rebuildTreeFromCompactNodes] Root:', rootNode.path)
+  console.log('[rebuildTreeFromCompactNodes] Compact nodes:', compactNodes.length)
+
+  // Step 1: Build a map of all expanded nodes (path -> full FileNode)
+  const nodeMap = new Map<string, FileNode>()
+
+  // Normalize root path consistently
+  const rootPathNormalized = rootNode.path.toLowerCase().replace(/\\/g, '/').replace(/\/+$/, '')
+
+  // Add root with normalized path
+  const rootCopy = { ...rootNode }
+  nodeMap.set(rootPathNormalized, rootCopy)
+
+  console.log('[rebuildTreeFromCompactNodes] Root will be stored at:', rootPathNormalized)
+
+  // Expand all compact nodes and add to map
+  compactNodes.forEach((compactNode, index) => {
+    if (index < 3) {
+      console.log(`[rebuildTreeFromCompactNodes] Processing compact node ${index}: "${compactNode.n}", parentPath: "${rootNode.path}"`)
+    }
+    expandAndAddToMap(compactNode, rootNode.path, nodeMap)
+  })
+
+  console.log('[rebuildTreeFromCompactNodes] Total nodes in map:', nodeMap.size)
+
+  // Debug: Check if root is in map
+  const rootInMap = nodeMap.get(rootPathNormalized)
+  console.log('[rebuildTreeFromCompactNodes] Root found in map:', !!rootInMap)
+
+  // Step 2: Build parent-child relationships
+  const childrenMap = new Map<string, FileNode[]>()
+
+  console.log('[rebuildTreeFromCompactNodes] Root normalized:', rootPathNormalized)
+
+  nodeMap.forEach((node, normalizedPath) => {
+    if (normalizedPath === rootPathNormalized) {
+      return // Skip root
+    }
+
+    // Find parent path
+    const lastSlashIndex = normalizedPath.lastIndexOf('/')
+    let parentPath: string
+
+    if (lastSlashIndex <= 0) {
+      // No slash - direct child of root (shouldn't happen for D:\)
+      parentPath = rootPathNormalized
+    } else {
+      parentPath = normalizedPath.substring(0, lastSlashIndex)
+
+      // Special case: if parent is "d:" it's actually root "d:/"
+      if (parentPath.length === 2 && parentPath.endsWith(':')) {
+        parentPath = rootPathNormalized
+      }
+    }
+
+    if (!childrenMap.has(parentPath)) {
+      childrenMap.set(parentPath, [])
+    }
+    childrenMap.get(parentPath)!.push(node)
+  })
+
+  console.log('[rebuildTreeFromCompactNodes] Children map entries:', childrenMap.size)
+  // Debug: show some parent-child relationships
+  let debugCount = 0
+  childrenMap.forEach((children, parent) => {
+    if (debugCount < 5) {
+      console.log(`  Parent "${parent}" has ${children.length} children`)
+      debugCount++
+    }
+  })
+
+  // Step 3: Assign children to all nodes
+  console.log('[rebuildTreeFromCompactNodes] Assigning children to nodes...')
+  let assignedCount = 0
+  nodeMap.forEach((node, normalizedPath) => {
+    const children = childrenMap.get(normalizedPath) || []
+    if (children.length > 0) {
+      node.children = children
+      assignedCount++
+      if (assignedCount <= 3) {
+        console.log(`  Assigned ${children.length} children to "${normalizedPath}"`)
+      }
+    } else {
+      node.children = []
+    }
+  })
+  console.log('[rebuildTreeFromCompactNodes] Total nodes with children:', assignedCount)
+
+  const result = nodeMap.get(rootPathNormalized)
+  console.log('[rebuildTreeFromCompactNodes] Rebuild complete')
+  console.log('[rebuildTreeFromCompactNodes] Root children:', result?.children?.length || 0)
+
+  if (result && result.children) {
+    console.log('[rebuildTreeFromCompactNodes] All root children:')
+    result.children.forEach((child, index) => {
+      console.log(`  ${index + 1}. "${child.name}" - size: ${child.size} - isDir: ${child.isDirectory}`)
+    })
   }
-  return scaledNode
+
+  if (!result) {
+    console.error('[rebuildTreeFromCompactNodes] ERROR: Root not found in nodeMap!')
+  }
+
+  return result || rootNode
+}
+
+// Helper: Recursively expand compact node and add all descendants to map
+let expandDebugCount = 0
+function expandAndAddToMap(compactNode: any, parentPath: string, nodeMap: Map<string, FileNode>) {
+  // Compact format: { n: name, s: size, c: children, d: isDirectory }
+
+  // Build path correctly (Windows style)
+  let nodePath: string
+  if (parentPath.endsWith('\\') || parentPath.endsWith('/')) {
+    nodePath = `${parentPath}${compactNode.n}`
+  } else {
+    nodePath = `${parentPath}\\${compactNode.n}`
+  }
+
+  // Normalize for map key
+  const normalizedPath = nodePath.toLowerCase().replace(/\\/g, '/').replace(/\/+$/, '')
+
+  if (expandDebugCount < 20) {
+    console.log(`  [expandAndAddToMap] name="${compactNode.n}", parent="${parentPath}", built="${nodePath}"`)
+    expandDebugCount++
+  }
+
+  const node: FileNode = {
+    name: compactNode.n,
+    size: compactNode.s,
+    path: nodePath,
+    isDirectory: compactNode.d,
+    children: []
+  }
+
+  nodeMap.set(normalizedPath, node)
+
+  // Recursively process children
+  if (compactNode.c && Array.isArray(compactNode.c)) {
+    compactNode.c.forEach((child: any) => {
+      expandAndAddToMap(child, nodePath, nodeMap)
+    })
+  }
+}
+
+// Build tree from root metadata and cached directory nodes - O(n) algorithm
+function buildTreeFromCache(rootMetadata: FileNode, cachedDirs: Map<string, FileNode>): FileNode {
+  console.log('[buildTreeFromCache] Starting tree build')
+  console.log('[buildTreeFromCache] Root path:', rootMetadata.path)
+  console.log('[buildTreeFromCache] Cached directories:', cachedDirs.size)
+
+  const startTime = performance.now()
+
+  // Normalize path for comparison (handle both Windows and Unix paths)
+  const normalizePath = (p: string): string => {
+    return p.replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '') // Remove trailing slashes
+  }
+
+  // Step 1: Build parent -> children map in O(n) time
+  const childrenMap = new Map<string, FileNode[]>()
+  const rootPathNormalized = normalizePath(rootMetadata.path)
+
+  cachedDirs.forEach((node) => {
+    const normalizedPath = normalizePath(node.path)
+
+    // Skip if it's the root itself
+    if (normalizedPath === rootPathNormalized) {
+      return
+    }
+
+    // Find parent path (remove last segment)
+    const lastSlashIndex = normalizedPath.lastIndexOf('/')
+
+    let parentPath: string
+
+    if (lastSlashIndex <= 0) {
+      // No slash or only at start - this is a direct child of root
+      parentPath = rootPathNormalized
+    } else {
+      // Extract parent path
+      parentPath = normalizedPath.substring(0, lastSlashIndex)
+
+      // Special case: if parent is single letter (like "d:"), it's root
+      if (parentPath.length <= 2 && parentPath.includes(':')) {
+        parentPath = rootPathNormalized
+      }
+    }
+
+    if (!childrenMap.has(parentPath)) {
+      childrenMap.set(parentPath, [])
+    }
+    childrenMap.get(parentPath)!.push(node)
+  })
+
+  // Debug: Show some parent-child relationships
+  console.log('[buildTreeFromCache] Sample parent-child relationships:')
+  let sampleCount = 0
+  childrenMap.forEach((children, parent) => {
+    if (sampleCount < 3) {
+      console.log(`  "${parent}" has ${children.length} children`)
+      sampleCount++
+    }
+  })
+
+  console.log('[buildTreeFromCache] Built parent-children map in', (performance.now() - startTime).toFixed(2), 'ms')
+  console.log('[buildTreeFromCache] Parent map has', childrenMap.size, 'entries')
+
+  // Step 2: Build tree using bottom-up approach (no recursion, no stack overflow)
+  // Create a map of all nodes (including the ones we'll build)
+  const nodeMap = new Map<string, FileNode>()
+
+  // Add root
+  nodeMap.set(rootPathNormalized, { ...rootMetadata, children: [] })
+
+  // Add all cached directories
+  cachedDirs.forEach((node) => {
+    const normalizedPath = normalizePath(node.path)
+    nodeMap.set(normalizedPath, { ...node, children: [] })
+  })
+
+  console.log('[buildTreeFromCache] Building tree bottom-up...')
+
+  // Now link children to parents using the childrenMap
+  childrenMap.forEach((children, parentPath) => {
+    const parentNode = nodeMap.get(parentPath)
+    if (parentNode) {
+      parentNode.children = children.map(child => {
+        const normalizedChildPath = normalizePath(child.path)
+        return nodeMap.get(normalizedChildPath) || child
+      })
+    }
+  })
+
+  const result = nodeMap.get(rootPathNormalized)
+
+  const totalTime = (performance.now() - startTime).toFixed(2)
+  console.log('[buildTreeFromCache] Tree built successfully in', totalTime, 'ms')
+  console.log('[buildTreeFromCache] Root children count:', result?.children?.length || 0)
+
+  if (!result) {
+    console.error('[buildTreeFromCache] Failed to build tree!')
+    return rootMetadata
+  }
+
+  return result
 }
 
 function AnalyzeContent() {
@@ -114,6 +354,9 @@ function AnalyzeContent() {
 
   // Use ref to track component state
   const scanningRef = useRef(false)
+
+  // Cache compact nodes from batches
+  const compactNodesCache = useRef<any[]>([])
 
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoveredSectorId, setHoveredSectorId] = useState<string | null>(null)
@@ -231,34 +474,48 @@ function AnalyzeContent() {
 
     const scanFolder = async () => {
       try {
-        console.log('🚀 Starting scan:', path)
+        console.log('[DEBUG] ========== STARTING SCAN ==========')
+        console.log('[DEBUG] Scan path:', path)
+        console.log('[DEBUG] scanningRef.current:', scanningRef.current)
 
         scanningRef.current = true
         setIsLoading(true)
         setScanProgress({ currentPath: path, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
 
-        // Create channel for streaming batches
-        const onBatch = new Channel<{ nodes: FileNode[]; total_scanned: number; total_size: number; is_complete: boolean; root_node?: FileNode; disk_info?: { total_space: number; available_space: number; used_space: number }; current_path?: string }>()
-        onBatch.onmessage = (message) => {
-          // Use disk_info.used_space as estimated total for progress calculation
-          const estimatedTotal = message.disk_info ? message.disk_info.used_space : 0
+        console.log('[DEBUG] Initial states set, creating channel...')
 
-          // Log progress update
-          const progress = estimatedTotal > 0 ? (message.total_size / estimatedTotal * 100).toFixed(2) : 0
-          console.log('📊 Scan Progress:', {
-            filesScanned: message.total_scanned.toLocaleString(),
-            scannedSize: `${(message.total_size / 1_000_000_000).toFixed(2)} GB`,
-            estimatedTotal: estimatedTotal > 0 ? `${(estimatedTotal / 1_000_000_000).toFixed(2)} GB` : 'N/A',
-            progress: estimatedTotal > 0 ? `${progress}%` : 'N/A',
-            currentPath: message.current_path,
-            isComplete: message.is_complete,
-            diskInfo: message.disk_info ? {
-              totalSpace: `${(message.disk_info.total_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.total_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`,
-              usedSpace: `${(message.disk_info.used_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.used_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`,
-              availableSpace: `${(message.disk_info.available_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.available_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`,
-            } : null
+        // Create channel for streaming batches
+        const onBatch = new Channel<{
+          nodes: FileNode[];
+          compact_nodes?: any[];  // Batch of compact nodes
+          total_scanned: number;
+          total_size: number;
+          is_complete: boolean;
+          root_node?: FileNode;
+          compact_root?: any;  // Compact format from backend
+          disk_info?: { total_space: number; available_space: number; used_space: number };
+          current_path?: string
+        }>()
+        onBatch.onmessage = (message) => {
+          console.log('[DEBUG] Received batch message:', {
+            is_complete: message.is_complete,
+            total_scanned: message.total_scanned,
+            total_size: message.total_size,
+            total_size_formatted: formatBytes(message.total_size),
+            compact_nodes_count: message.compact_nodes?.length || 0,
+            has_root_node: !!message.root_node,
+            has_disk_info: !!message.disk_info,
+            current_path: message.current_path
           })
 
+          // Cache compact nodes from batches
+          if (message.compact_nodes && message.compact_nodes.length > 0) {
+            console.log('[DEBUG] Caching', message.compact_nodes.length, 'compact nodes')
+            compactNodesCache.current.push(...message.compact_nodes)
+            console.log('[DEBUG] Total cached compact nodes:', compactNodesCache.current.length)
+          }
+
+          // Update progress
           setScanProgress({
             currentPath: message.current_path || path,
             filesScanned: message.total_scanned,
@@ -266,57 +523,78 @@ function AnalyzeContent() {
             estimatedTotal
           })
 
-          // If complete, use root_node from the message
-          if (message.is_complete && message.root_node) {
-            // Calculate the scaling factor to match df's used_space
-            // This accounts for APFS copy-on-write, compression, and deduplication
-            let scaledRootNode = message.root_node
-            if (message.disk_info && message.total_size > 0) {
-              const scaleFactor = message.disk_info.used_space / message.total_size
-              console.log('📊 Scaling factor to match df:', {
-                scannedTotal: `${(message.total_size / 1_000_000_000).toFixed(2)} GB`,
-                dfUsedSpace: `${(message.disk_info.used_space / 1_000_000_000).toFixed(2)} GB`,
-                scaleFactor: scaleFactor.toFixed(4)
-              })
+          console.log('[DEBUG] Progress state updated')
 
-              // Scale the entire tree to match df's used_space
-              scaledRootNode = scaleNodeSizes(message.root_node, scaleFactor)
+          // If complete, rebuild tree from cached compact nodes
+          if (message.is_complete) {
+            console.log('[DEBUG] ========== SCAN COMPLETE ==========')
+            console.log('[DEBUG] Total cached compact nodes:', compactNodesCache.current.length)
+
+            if (message.disk_info) {
+              console.log('[DEBUG] Disk info:', {
+                totalSpace: formatBytes(message.disk_info.total_space),
+                availableSpace: formatBytes(message.disk_info.available_space),
+                usedSpace: formatBytes(message.disk_info.used_space)
+              })
             }
 
-            console.log('✅ Scan Complete!', {
-              totalFiles: message.total_scanned.toLocaleString(),
-              totalSize: `${(message.total_size / 1_000_000_000).toFixed(2)} GB (logical)`,
-              scaledSize: message.disk_info ? `${(message.disk_info.used_space / 1_000_000_000).toFixed(2)} GB (actual)` : 'N/A',
-              diskInfo: message.disk_info ? {
-                totalSpace: `${(message.disk_info.total_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.total_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`,
-                usedSpace: `${(message.disk_info.used_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.used_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`,
-                availableSpace: `${(message.disk_info.available_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.available_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`
-              } : 'N/A'
-            })
+            if (!message.root_node) {
+              console.error('[DEBUG] ❌ ERROR: is_complete=true but no root_node!')
+              return
+            }
 
-            setData(scaledRootNode)
-            setCurrentLevel(scaledRootNode)
-            setBreadcrumb([scaledRootNode])
+            console.log('[DEBUG] Building tree from cached compact nodes...')
+            const startTime = performance.now()
+
+            // Rebuild tree from cached compact nodes
+            const finalTree = rebuildTreeFromCompactNodes(message.root_node, compactNodesCache.current)
+
+            const buildTime = (performance.now() - startTime).toFixed(2)
+            console.log('[DEBUG] Tree rebuilt in', buildTime, 'ms')
+            console.log('[DEBUG] Final tree children:', finalTree.children?.length || 0)
+
+            console.log('[DEBUG] Setting final data states...')
+            setData(finalTree)
+            setCurrentLevel(finalTree)
+            setBreadcrumb([finalTree])
             setDiskInfo(message.disk_info ? {
               totalSpace: message.disk_info.total_space,
               availableSpace: message.disk_info.available_space,
               usedSpace: message.disk_info.used_space
             } : null)
+
+            console.log('[DEBUG] Setting isLoading = false')
             setIsLoading(false)
+            console.log('[DEBUG] Clearing scan progress')
             setScanProgress(null)
 
+            console.log('[DEBUG] Updating stats...')
             // 更新累計統計數據
             updateStats(message.total_scanned, message.total_size)
+
+            // Clear cache
+            console.log('[DEBUG] Clearing compact nodes cache')
+            compactNodesCache.current = []
+
+            console.log('[DEBUG] ========== SCAN COMPLETED SUCCESSFULLY ==========')
+          } else {
+            console.log('[DEBUG] Still scanning... (is_complete=false)')
           }
         }
 
         // Start streaming scan (returns immediately, scanning in background)
-        await invoke('scan_directory_streaming', { path, onBatch })
+        console.log('[DEBUG] Invoking scan_directory_streaming...')
+        const invokeResult = await invoke('scan_directory_streaming', { path, onBatch })
+        console.log('[DEBUG] scan_directory_streaming invoke returned:', invokeResult)
       } catch (error) {
-        console.error('❌ 掃描失敗:', error)
+        console.error('[DEBUG] ❌ SCAN FAILED')
+        console.error('[DEBUG] Error:', error)
+        console.error('[DEBUG] Error type:', typeof error)
+        console.error('[DEBUG] Error details:', JSON.stringify(error, null, 2))
         setIsLoading(false)
         setScanProgress(null)
       } finally {
+        console.log('[DEBUG] Scan finally block - setting scanningRef.current = false')
         scanningRef.current = false
         console.log('🏁 Scan finished (cleanup)')
       }
@@ -413,12 +691,26 @@ function AnalyzeContent() {
       const logicalAvailableSpace = isDiskRoot ? diskInfo.totalSpace - scannedSize : 0
       let currentAngle = 0
 
-      sortedRootChildren.forEach((node, index) => {
+      // Separate nodes: >= 1 degree vs < 1 degree
+      const mainNodes: FileNode[] = []
+      const tinyNodes: FileNode[] = []
+
+      sortedRootChildren.forEach((node) => {
+        const proportion = node.size / totalSize
+        const nodeAngleRange = 360 * proportion
+
+        if (nodeAngleRange >= 1) {
+          mainNodes.push(node)
+        } else {
+          tinyNodes.push(node)
+        }
+      })
+
+      // Process main nodes (>= 1 degree)
+      mainNodes.forEach((node, index) => {
         const proportion = node.size / totalSize
         const nodeAngleRange = 360 * proportion
         const nodeEndAngle = currentAngle + nodeAngleRange
-
-        // Don't filter the root level (layer 0)
 
         const colorScheme = COLOR_SCHEMES[index % COLOR_SCHEMES.length]
         const color = colorScheme[0]
@@ -445,8 +737,54 @@ function AnalyzeContent() {
         currentAngle = nodeEndAngle
       })
 
-      // Add logical available space for disk root (total - scanned)
-      if (isDiskRoot && logicalAvailableSpace > 0) {
+      // Merge tiny nodes (< 1 degree) into "其他"
+      if (tinyNodes.length > 0) {
+        const othersTotalSize = tinyNodes.reduce((sum, node) => sum + node.size, 0)
+        const othersProportion = othersTotalSize / totalSize
+        const othersAngleRange = 360 * othersProportion
+        const othersEndAngle = currentAngle + othersAngleRange
+
+        if (!layers.has(0)) {
+          layers.set(0, [])
+        }
+
+        // Create virtual "其他" node
+        layers.get(0)!.push({
+          name: `其他 (${tinyNodes.length} 項)`,
+          value: othersTotalSize,
+          color: 'rgba(128, 128, 128, 0.6)', // Gray color
+          path: '__others__',
+          node: {
+            name: `其他 (${tinyNodes.length} 項)`,
+            size: othersTotalSize,
+            path: '__others__',
+            isDirectory: false,
+            children: []
+          },
+          startAngle: currentAngle,
+          endAngle: othersEndAngle,
+        })
+
+        // Process children of tiny nodes within the "其他" angle range
+        // Use a special colorIndex to differentiate them
+        let tinyNodeAngle = currentAngle
+        tinyNodes.forEach((node) => {
+          const proportion = node.size / othersTotalSize
+          const nodeAngleRange = othersAngleRange * proportion
+          const nodeEndAngle = tinyNodeAngle + nodeAngleRange
+
+          if (node.isDirectory && node.children && node.children.length > 0) {
+            buildHierarchy(node.children, 1, tinyNodeAngle, nodeEndAngle, COLOR_SCHEMES.length - 1)
+          }
+
+          tinyNodeAngle = nodeEndAngle
+        })
+
+        currentAngle = othersEndAngle
+      }
+
+      // Add available space for disk root
+      if (isDiskRoot && diskInfo.availableSpace > 0) {
         if (!layers.has(0)) {
           layers.set(0, [])
         }
@@ -486,28 +824,51 @@ function AnalyzeContent() {
       })
     })
 
+    // Log only depth 0 (first layer) details
+    const layer0 = layers.get(0)
+    if (layer0) {
+      console.log(`[第一層組成] Total items: ${layer0.length}`)
+      layer0.forEach((item, index) => {
+        const angleRange = (item.endAngle ?? 0) - (item.startAngle ?? 0)
+        console.log(`  ${index + 1}. "${item.name}" - path: "${item.path}" - angle: ${angleRange.toFixed(2)}°`)
+      })
+    }
+
     return result.sort((a, b) => a.depth - b.depth)
   }
 
-  const prepareChartData = (node: FileNode | null): ChartData[] => {
+  // Prepare list data (for file list - shows all items)
+  const prepareListData = (node: FileNode | null): ChartData[] => {
     if (!node || !node.children) return []
 
-    return node.children
+    const sortedChildren = node.children
       .filter(child => child.size > 0)
       .sort((a, b) => b.size - a.size)
-      .slice(0, 10)
-      .map((child, index) => ({
+
+    // Calculate if viewing disk root
+    const isDiskRoot = diskInfo !== null && node === data
+    const scannedSize = sortedChildren.reduce((sum, child) => sum + child.size, 0)
+    const totalSize = isDiskRoot ? scannedSize + diskInfo.availableSpace : scannedSize
+
+    return sortedChildren.map((child, index) => {
+      const proportion = child.size / totalSize
+      const nodeAngleRange = 360 * proportion
+      const isTinyNode = nodeAngleRange < 1
+
+      return {
         name: child.name,
         value: child.size,
         color: COLORS[index % COLORS.length],
         path: child.path,
         node: child,
-      }))
+        isTinyNode, // Mark if this should be grouped in "其他"
+      }
+    })
   }
 
   // Prepare data (must be before conditional returns)
   const layers = prepareMultiLayerData(currentLevel)
-  const chartData = prepareChartData(currentLevel)
+  const listData = prepareListData(currentLevel)
 
   // Helper function to find a node's parent chain from root
   const findNodePath = (root: FileNode, targetPath: string): FileNode[] | null => {
@@ -560,7 +921,7 @@ function AnalyzeContent() {
   }
 
   const handlePieClick = (entry: ChartData) => {
-    if (!entry.node || entry.name === '可用空間') return
+    if (!entry.node || entry.name === '可用空間' || entry.path === '__others__') return
     navigateToNode(entry.node)
   }
 
@@ -997,14 +1358,15 @@ function AnalyzeContent() {
         <div className="bg-card/60 backdrop-blur-md p-3 flex flex-col overflow-hidden">
           <h2 className="text-xs font-semibold mb-2 text-foreground flex items-center gap-1.5 flex-shrink-0">
             <span className="w-0.5 h-3 bg-primary rounded-full"></span>
-            Files & Folders
+            Files & Folders ({listData.length})
           </h2>
-          <div 
+          <div
             className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-0.5 file-list"
             onMouseLeave={handleLeave}
           >
-            {chartData.map((item) => {
-              const sectorId = generateSectorId(item.path, 0)
+            {listData.map((item) => {
+              // If this is a tiny node merged into "其他", use __others__ as sectorId
+              const sectorId = item.isTinyNode ? generateSectorId('__others__', 0) : generateSectorId(item.path, 0)
               const fileTypeInfo = getFileTypeInfo(item.name, item.node.isDirectory)
               const IconComponent = fileTypeInfo.icon
 
