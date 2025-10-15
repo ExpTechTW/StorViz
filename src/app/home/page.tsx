@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { open } from '@tauri-apps/plugin-dialog'
-import { FolderOpen, HardDrive, BarChart3, Shield, Eye, Layers } from 'lucide-react'
+import { FolderOpen, HardDrive, BarChart3, Shield, Eye, Layers, ArrowLeft } from 'lucide-react'
 import { StatsDisplay } from '@/components/StatsDisplay'
 
 // Feature card component
@@ -35,6 +35,22 @@ export default function HomePage() {
   const [selectedPath, setSelectedPath] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const [showCards, setShowCards] = useState(true)
+  const [showButtons, setShowButtons] = useState(false)
+
+  // 縮短路徑顯示 - 在 / 之間省略
+  const getDisplayPath = (path: string) => {
+    if (path.length <= 40) return path
+
+    const parts = path.split('/')
+    if (parts.length <= 3) return path
+
+    // 保留開頭和結尾各 2 個部分
+    const start = parts.slice(0, 2).join('/')
+    const end = parts.slice(-2).join('/')
+
+    return `${start}/.../.../${end}`
+  }
 
   // Feature data
   const features = [
@@ -46,7 +62,7 @@ export default function HomePage() {
   // Mouse tracking for cursor glow effect
   useEffect(() => {
     let animationFrame: number
-    
+
     const handleMouseMove = (e: MouseEvent) => {
       if (animationFrame) cancelAnimationFrame(animationFrame)
       animationFrame = requestAnimationFrame(() => {
@@ -60,6 +76,27 @@ export default function HomePage() {
       if (animationFrame) cancelAnimationFrame(animationFrame)
     }
   }, [])
+
+  // 處理卡片切換動畫 - 1秒淡出後才顯示下一組
+  useEffect(() => {
+    if (selectedPath) {
+      // 選擇路徑後，隱藏 6 個卡片
+      setShowCards(false)
+      // 1 秒後顯示按鈕組
+      const timer = setTimeout(() => {
+        setShowButtons(true)
+      }, 1000)
+      return () => clearTimeout(timer)
+    } else {
+      // 清空路徑後，隱藏按鈕組
+      setShowButtons(false)
+      // 1 秒後顯示 6 個卡片
+      const timer = setTimeout(() => {
+        setShowCards(true)
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [selectedPath])
 
   // Event handlers
   const handleSelectFolder = async () => {
@@ -93,7 +130,7 @@ export default function HomePage() {
       </div>
 
       {/* Cursor Follow Glow - Bottom Layer */}
-      <div 
+      <div
         className="fixed pointer-events-none z-10"
         style={{
           left: mousePosition.x - 150,
@@ -107,7 +144,7 @@ export default function HomePage() {
         <div className="w-full h-full bg-primary/8 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="space-y-8 relative z-10">
+      <div className="relative z-10" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex justify-center">
@@ -128,71 +165,112 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Statistics & Features */}
-        <div className="space-y-3">
-          {/* Statistics - Row 1 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 200px)', gap: '12px', justifyContent: 'center' }}>
-            <StatsDisplay />
-          </div>
-
-          {/* Features - Row 2 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 200px)', gap: '12px', justifyContent: 'center' }}>
-            {features.map((feature, index) => (
-              <FeatureCard
-                key={index}
-                icon={feature.icon}
-                title={feature.title}
-                description={feature.description}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Main Card */}
-        <div className="bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm rounded-lg border border-border/50 shadow-lg p-3 space-y-3 hover:shadow-xl transition-all duration-300 relative overflow-hidden" style={{ width: '300px', margin: '0 auto' }}>
-          <div className="absolute top-0 right-0 w-12 h-12 bg-primary/5 rounded-full blur-lg"></div>
-          <div className="absolute bottom-0 left-0 w-10 h-10 bg-primary/5 rounded-full blur-md"></div>
-          <div className="relative z-10 space-y-3">
-            <div className="text-center space-y-1">
-              <h2 className="text-sm font-bold text-foreground">開始分析</h2>
-              <p className="text-[10px] text-muted-foreground">選擇資料夾開始探索</p>
+        {/* 卡片切換容器 */}
+        <div className="relative" style={{ minHeight: '200px' }}>
+          {/* Statistics & Features - 第一組 */}
+          <div className={`space-y-3 ${showCards ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-75 pointer-events-none invisible'}`} style={{ transition: 'opacity 1s ease-in-out, transform 1s ease-in-out, visibility 0s linear 1s' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 200px)', gap: '12px', justifyContent: 'center' }}>
+              <StatsDisplay />
             </div>
-
-            <div className="space-y-2">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 200px)', gap: '12px', justifyContent: 'center' }}>
+              {features.map((feature, index) => (
+                <FeatureCard
+                  key={index}
+                  icon={feature.icon}
+                  title={feature.title}
+                  description={feature.description}
+                />
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 200px)', gap: '12px', justifyContent: 'center' }}>
               <button
                 onClick={handleSelectFolder}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-secondary to-secondary/80 hover:from-secondary/90 hover:to-secondary/70 text-secondary-foreground rounded-md transition-all duration-300 hover:scale-[1.02] hover:shadow-md border border-border/50 relative group"
+                className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg group relative overflow-hidden"
               >
-                <div className="absolute inset-0 bg-primary/5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <FolderOpen className="w-3 h-3 relative z-10" />
-                <span className="text-xs font-medium relative z-10">瀏覽資料夾</span>
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300 shadow-sm">
+                  <FolderOpen className="w-4 h-4 text-primary" />
+                </div>
+                <div className="relative z-10">
+                  <h3 className="text-sm font-bold text-foreground mb-1">瀏覽資料夾</h3>
+                  <p className="text-[10px] text-muted-foreground">選擇分析目標</p>
+                </div>
               </button>
 
+              <button
+                disabled
+                className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 opacity-50 cursor-not-allowed group relative overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0"></div>
+                <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center shadow-sm">
+                  <BarChart3 className="w-4 h-4 text-primary" />
+                </div>
+                <div className="relative z-10">
+                  <h3 className="text-sm font-bold text-foreground mb-1">開始分析</h3>
+                  <p className="text-[10px] text-muted-foreground">執行掃描任務</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* 已選擇路徑卡片和按鈕 - 第二組 */}
+          <div className={`absolute ${showButtons ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-75 pointer-events-none invisible'}`} style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)', transition: 'opacity 1s ease-in-out, transform 1s ease-in-out, visibility 0s linear 1s' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
               {selectedPath && (
-                <div className="p-2 bg-gradient-to-r from-muted/50 to-muted/30 rounded-md border border-border/30">
-                  <p className="text-[10px] text-muted-foreground mb-1">已選擇：</p>
-                  <p className="text-[10px] text-foreground font-mono break-all">{selectedPath}</p>
+                <div className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-500 hover:shadow-lg group relative overflow-hidden" style={{ width: '412px' }}>
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                  <div className="relative z-10 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider mb-1">已選擇路徑</h3>
+                      <p className="text-[11px] text-foreground font-mono leading-relaxed truncate" title={selectedPath}>{getDisplayPath(selectedPath)}</p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedPath('')}
+                      className="w-8 h-8 bg-gradient-to-br from-muted/50 to-muted/30 rounded-lg flex items-center justify-center hover:from-muted/70 hover:to-muted/50 transition-all duration-500 hover:scale-110 hover:rotate-[-8deg] border border-border/30 group/back relative overflow-hidden"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-0 group-hover/back:opacity-100 transition-opacity duration-500"></div>
+                      <ArrowLeft className="w-4 h-4 text-foreground relative z-10 transition-transform duration-500 group-hover/back:translate-x-[-2px]" />
+                    </button>
+                  </div>
                 </div>
               )}
 
-              <button
-                onClick={handleAnalyze}
-                disabled={!selectedPath || isLoading}
-                className="w-full px-3 py-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 text-primary-foreground font-semibold rounded-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] hover:shadow-lg disabled:hover:scale-100 flex items-center justify-center gap-2 relative group"
-              >
-                <div className="absolute inset-0 bg-primary-foreground/10 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                {isLoading ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin relative z-10"></div>
-                    <span className="text-xs relative z-10">分析中...</span>
-                  </>
-                ) : (
-                  <>
-                    <BarChart3 className="w-3 h-3 relative z-10" />
-                    <span className="text-xs relative z-10">開始分析</span>
-                  </>
-                )}
-              </button>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 200px)', gap: '12px', justifyContent: 'center' }}>
+                <button
+                  onClick={handleSelectFolder}
+                  className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg group relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300 shadow-sm">
+                    <FolderOpen className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="relative z-10">
+                    <h3 className="text-sm font-bold text-foreground mb-1">瀏覽資料夾</h3>
+                    <p className="text-[10px] text-muted-foreground">選擇分析目標</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleAnalyze}
+                  disabled={!selectedPath || isLoading}
+                  className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300 shadow-sm">
+                    {isLoading ? (
+                      <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                    ) : (
+                      <BarChart3 className="w-4 h-4 text-primary" />
+                    )}
+                  </div>
+                  <div className="relative z-10">
+                    <h3 className="text-sm font-bold text-foreground mb-1">
+                      {isLoading ? '分析中...' : '開始分析'}
+                    </h3>
+                    <p className="text-[10px] text-muted-foreground">執行掃描任務</p>
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
         </div>
