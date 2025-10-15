@@ -429,14 +429,37 @@ function AnalyzeContent() {
   const layers = prepareMultiLayerData(currentLevel)
   const chartData = prepareChartData(currentLevel)
 
-  const handlePieClick = (entry: ChartData, index: number) => {
-    if (!currentLevel || !currentLevel.children) return
+  // Helper function to navigate to a node (used by both chart and file list)
+  const navigateToNode = (targetNode: FileNode) => {
+    if (!targetNode.isDirectory || !targetNode.children) return
 
-    const clickedNode = currentLevel.children.find(child => child.path === entry.path)
-    if (clickedNode && clickedNode.isDirectory && clickedNode.children) {
-      setCurrentLevel(clickedNode)
-      setBreadcrumb([...breadcrumb, clickedNode])
+    console.log('Navigating to node:', targetNode.path)
+    console.log('Current breadcrumb:', breadcrumb.map(b => b.path))
+
+    // Build path from root to target node
+    const buildPathToNode = (node: FileNode): FileNode[] => {
+      // If node is already in breadcrumb, just navigate to it
+      const existingIndex = breadcrumb.findIndex(b => b.path === node.path)
+      if (existingIndex !== -1) {
+        console.log('Node already in breadcrumb at index:', existingIndex)
+        return breadcrumb.slice(0, existingIndex + 1)
+      }
+
+      // Otherwise, need to build the full path
+      // Start from current breadcrumb and add the new node
+      console.log('Adding new node to breadcrumb')
+      return [...breadcrumb, node]
     }
+
+    const newBreadcrumb = buildPathToNode(targetNode)
+    console.log('New breadcrumb:', newBreadcrumb.map(b => b.path))
+    setBreadcrumb(newBreadcrumb)
+    setCurrentLevel(targetNode)
+  }
+
+  const handlePieClick = (entry: ChartData) => {
+    if (!entry.node || entry.name === '可用空間') return
+    navigateToNode(entry.node)
   }
 
   if (!path) {
@@ -510,68 +533,51 @@ function AnalyzeContent() {
   }
 
 
-  // Generate breadcrumb path segments
+  // Generate breadcrumb path segments from breadcrumb array
   const generateBreadcrumbSegments = () => {
-    if (!currentLevel?.path || !path) return []
-    
-    const rootPath = path
-    const currentPath = currentLevel.path
-    
-    // Normalize paths (handle Windows backslashes)
-    const normalizedRootPath = rootPath.replace(/\\/g, '/')
-    const normalizedCurrentPath = currentPath.replace(/\\/g, '/')
-    
-    // Split paths into segments
-    const rootSegments = normalizedRootPath.split('/').filter(Boolean)
-    const currentSegments = normalizedCurrentPath.split('/').filter(Boolean)
-    
-    // Find the relative path from root
-    const segments = []
-    
-    // Always include the root directory
-    segments.push({
-      name: rootSegments[rootSegments.length - 1] || 'Root',
-      path: normalizedRootPath,
-      isClickable: currentPath !== rootPath
-    })
-    
-    // Add subdirectories if we're deeper than root
-    if (currentPath !== rootPath) {
-      const relativeSegments = currentSegments.slice(rootSegments.length)
-      for (let i = 0; i < relativeSegments.length; i++) {
-        const segment = relativeSegments[i]
-        const segmentPath = rootSegments.concat(relativeSegments.slice(0, i + 1)).join('/')
-        
-        segments.push({
-          name: segment,
-          path: segmentPath,
-          isClickable: i < relativeSegments.length - 1 // Last segment is not clickable
-        })
+    if (breadcrumb.length === 0) return []
+
+    return breadcrumb.map((node, index) => {
+      const isLast = index === breadcrumb.length - 1
+      const pathParts = node.path.replace(/\\/g, '/').split('/').filter(Boolean)
+      const name = pathParts[pathParts.length - 1] || 'Root'
+
+      return {
+        name,
+        path: node.path,
+        isClickable: !isLast // Only last segment is not clickable
       }
-    }
-    
-    return segments
+    })
   }
 
   // Handle breadcrumb click
   const handleBreadcrumbClick = (targetPath: string) => {
+    console.log('Breadcrumb clicked, targetPath:', targetPath)
+    console.log('Current breadcrumb:', breadcrumb.map(b => b.path))
+
     // Normalize the target path
     const normalizedTargetPath = targetPath.replace(/\\/g, '/')
-    
+
     // Find the node in breadcrumb that matches the target path
     const targetNode = breadcrumb.find(node => {
       const normalizedNodePath = node.path.replace(/\\/g, '/')
       return normalizedNodePath === normalizedTargetPath
     })
-    
+
+    console.log('Target node found:', targetNode?.path)
+
     if (targetNode) {
       const targetIndex = breadcrumb.findIndex(node => {
         const normalizedNodePath = node.path.replace(/\\/g, '/')
         return normalizedNodePath === normalizedTargetPath
       })
+      console.log('Target index:', targetIndex)
       const newBreadcrumb = breadcrumb.slice(0, targetIndex + 1)
+      console.log('New breadcrumb:', newBreadcrumb.map(b => b.path))
       setBreadcrumb(newBreadcrumb)
       setCurrentLevel(targetNode)
+    } else {
+      console.log('Target node NOT found!')
     }
   }
 
@@ -738,9 +744,8 @@ function AnalyzeContent() {
                                       animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                     }}
                                     onClick={() => {
-                                      if (item.node.isDirectory && item.node.children) {
-                                        setCurrentLevel(item.node)
-                                        setBreadcrumb([...breadcrumb, item.node])
+                                      if (item.name !== '可用空間') {
+                                        navigateToNode(item.node)
                                       }
                                     }}
                                   >
@@ -795,9 +800,8 @@ function AnalyzeContent() {
                                   animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                 }}
                                 onClick={() => {
-                                  if (item.node.isDirectory && item.node.children) {
-                                    setCurrentLevel(item.node)
-                                    setBreadcrumb([...breadcrumb, item.node])
+                                  if (item.name !== '可用空間') {
+                                    navigateToNode(item.node)
                                   }
                                 }}
                               >
@@ -831,7 +835,7 @@ function AnalyzeContent() {
             className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-0.5 file-list"
             onMouseLeave={handleLeave}
           >
-            {chartData.map((item, index) => {
+            {chartData.map((item) => {
               const sectorId = generateSectorId(item.path, 0)
               return (
               <div
@@ -839,7 +843,7 @@ function AnalyzeContent() {
                 className="flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent file-item"
                 data-sector-id={sectorId}
                 onMouseEnter={() => handleHover(sectorId)}
-                onClick={() => handlePieClick(item, index)}
+                onClick={() => handlePieClick(item)}
                 title={item.name === '可用空間' 
                   ? `💾 可用空間 - ${formatBytes(item.value)}${diskInfo ? `\n總容量: ${formatBytes(diskInfo.totalSpace)}` : ''}`
                   : `${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${item.name} - ${formatBytes(item.value)}`

@@ -157,10 +157,6 @@ fn get_disk_info(path: &Path) -> Option<DiskInfo> {
     for disk in disks.list() {
         let disk_path = disk.mount_point().to_string_lossy();
         
-        // Only log when we find a match to reduce noise
-        if path_str.starts_with(&*disk_path) {
-            println!("DEBUG: Found matching disk '{}' for path '{}'", disk_path, path_str);
-        }
         
         // Check if the path is on this disk
         if path_str.starts_with(&*disk_path) {
@@ -174,16 +170,13 @@ fn get_disk_info(path: &Path) -> Option<DiskInfo> {
             let mount_point_len = disk_path.len();
             if best_match.is_none() || mount_point_len > best_match.as_ref().unwrap().0 {
                 best_match = Some((mount_point_len, disk_info));
-                println!("DEBUG: New best match with mount point '{}' (length: {})", disk_path, mount_point_len);
             }
         }
     }
     
     if let Some((_, disk_info)) = best_match {
-        println!("DEBUG: Using best match for path '{}'", path_str);
         Some(disk_info)
     } else {
-        println!("DEBUG: No matching disk found for path '{}'", path_str);
         None
     }
 }
@@ -244,18 +237,8 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
         
         // Get disk info for root directory scans
         let disk_info = if is_root_directory(&path) {
-            println!("DEBUG: Detected root directory: {}", path);
-            let info = get_disk_info(root_path);
-            if let Some(ref disk) = info {
-                println!("DEBUG: Disk info - Total: {} GB, Available: {} GB", 
-                    disk.total_space / (1024*1024*1024), 
-                    disk.available_space / (1024*1024*1024));
-            } else {
-                println!("DEBUG: Failed to get disk info for path: {}", path);
-            }
-            info
+            get_disk_info(root_path)
         } else {
-            println!("DEBUG: Not a root directory: {}", path);
             None
         };
         
@@ -344,8 +327,6 @@ fn scan_directory_recursive(
     if let Ok(canonical_root) = fs::canonicalize(root_path) {
         if let Ok(canonical_path) = fs::canonicalize(path) {
             if !canonical_path.starts_with(&canonical_root) {
-                println!("DEBUG: Skipping path above root: {} (canonical: {}) (root canonical: {})", 
-                         path_str, canonical_path.display(), canonical_root.display());
                 return Ok(FileNode {
                     name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
                     size: 0,
@@ -360,7 +341,6 @@ fn scan_directory_recursive(
     // Check for circular path using canonicalized path
     if let Ok(canonical_path) = fs::canonicalize(path) {
         if state.is_in_recursion_stack(&canonical_path) {
-            println!("DEBUG: Detected circular path: {} (canonical: {})", path_str, canonical_path.display());
             return Ok(FileNode {
                 name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
                 size: 0,
@@ -379,7 +359,6 @@ fn scan_directory_recursive(
     {
         let inode = metadata.ino();
         if state.is_visited_inode(inode) {
-            println!("DEBUG: Skipping already visited inode: {} ({})", inode, path_str);
             return Ok(FileNode {
                 name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
                 size: 0,
@@ -396,14 +375,12 @@ fn scan_directory_recursive(
 
     // Handle symlinks by following them
     if metadata.file_type().is_symlink() {
-        println!("DEBUG: Following symlink: {}", path_str);
         // Try to follow the symlink
         if let Ok(target_path) = fs::read_link(path) {
             if let Ok(target_metadata) = fs::metadata(&target_path) {
                 if target_metadata.is_file() {
                     // Use filesize to get actual disk usage for symlinked files
                     let file_size = target_path.size_on_disk().unwrap_or(0);
-                    println!("DEBUG: Symlink '{}' points to file of actual size: {} bytes", path_str, file_size);
                     state.add_size(file_size);
                     
                     return Ok(FileNode {
@@ -418,8 +395,6 @@ fn scan_directory_recursive(
                     if let Ok(canonical_root) = fs::canonicalize(root_path) {
                         if let Ok(canonical_target) = fs::canonicalize(&target_path) {
                             if !canonical_target.starts_with(&canonical_root) {
-                                println!("DEBUG: Symlink '{}' points to directory above root: {} (canonical: {}) (root canonical: {})", 
-                                         path_str, target_path.display(), canonical_target.display(), canonical_root.display());
                                 return Ok(FileNode {
                                     name,
                                     size: 0,
@@ -433,7 +408,6 @@ fn scan_directory_recursive(
                     
                     if let Ok(canonical_target) = fs::canonicalize(&target_path) {
                         if state.is_in_recursion_stack(&canonical_target) {
-                            println!("DEBUG: Symlink '{}' points to directory already in recursion stack: {}", path_str, canonical_target.display());
                             return Ok(FileNode {
                                 name,
                                 size: 0,
@@ -445,14 +419,12 @@ fn scan_directory_recursive(
                     }
                     
                     // Safe to scan the target directory
-                    println!("DEBUG: Symlink '{}' points to directory, scanning target", path_str);
                     return scan_directory_recursive(&target_path, channel, state, root_path);
                 }
             }
         }
         
         // If we can't follow the symlink, return size 0
-        println!("DEBUG: Cannot follow symlink: {}", path_str);
         return Ok(FileNode {
             name,
             size: 0,
@@ -466,15 +438,6 @@ fn scan_directory_recursive(
         // Use filesize to get actual disk usage (handles sparse files correctly)
         let file_size = path.size_on_disk().unwrap_or(0);
         
-        // Log very large files (>100MB) for debugging
-        if file_size > 100_000_000 {
-            println!("DEBUG: Very large file '{}' actual size: {} bytes", name, file_size);
-        }
-        
-        // Only log large files (>10MB) to reduce noise
-        if file_size > 10_000_000 {
-            println!("DEBUG: Large file '{}' actual size: {} bytes", name, file_size);
-        }
         state.add_size(file_size);
 
         let node = FileNode {
@@ -518,11 +481,6 @@ fn scan_directory_recursive(
 
         let dir_total_size: u64 = children.iter().map(|c| c.size).sum();
         
-        // Only log large directories (>100MB) to reduce noise
-        if dir_total_size > 100_000_000 {
-            println!("DEBUG: Large directory '{}' total size: {} bytes ({} children)", 
-                     name, dir_total_size, children.len());
-        }
 
         Ok(FileNode {
             name,
