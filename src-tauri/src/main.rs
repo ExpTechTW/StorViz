@@ -63,6 +63,7 @@ struct ScanState {
     cancelled: Arc<AtomicBool>,
     current_path: Arc<Mutex<String>>,
     path_update_counter: Arc<Mutex<usize>>,
+    disk_info: Arc<Mutex<Option<DiskInfo>>>,
 }
 
 impl ScanState {
@@ -77,6 +78,7 @@ impl ScanState {
             cancelled: Arc::new(AtomicBool::new(false)),
             current_path: Arc::new(Mutex::new(String::new())),
             path_update_counter: Arc::new(Mutex::new(0)),
+            disk_info: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -187,6 +189,20 @@ impl ScanState {
         }
         false
     }
+
+    fn set_disk_info(&self, info: Option<DiskInfo>) {
+        if let Ok(mut disk_info) = self.disk_info.lock() {
+            *disk_info = info;
+        }
+    }
+
+    fn get_disk_info(&self) -> Option<DiskInfo> {
+        if let Ok(disk_info) = self.disk_info.lock() {
+            disk_info.clone()
+        } else {
+            None
+        }
+    }
 }
 
 // Get disk space information using sysinfo
@@ -287,14 +303,17 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
         }
 
         let root_path = Path::new(&path);
-        
+
         // Get disk info for root directory scans
         let disk_info = if is_root_directory(&path) {
             get_disk_info(root_path)
         } else {
             None
         };
-        
+
+        // Store disk_info in state so it can be sent with every update
+        state.set_disk_info(disk_info.clone());
+
         if let Ok(root_node) = scan_directory_recursive(root_path, &on_batch, &state, root_path) {
             let limited_root = build_limited_depth_node(&root_node, MAX_DEPTH);
             send_final_batch(&on_batch, &state, limited_root, disk_info);
@@ -345,6 +364,7 @@ fn send_batch(channel: &Channel<PartialScanResult>, state: &ScanState) {
     let (total_items, total_size) = state.get_stats();
     let nodes = state.clear_buffer();
     let current_path = state.get_current_path();
+    let disk_info = state.get_disk_info();
 
     let payload = PartialScanResult {
         nodes,
@@ -352,7 +372,7 @@ fn send_batch(channel: &Channel<PartialScanResult>, state: &ScanState) {
         total_size,
         is_complete: false,
         root_node: None,
-        disk_info: None,
+        disk_info,
         current_path: Some(current_path),
     };
 
@@ -362,6 +382,7 @@ fn send_batch(channel: &Channel<PartialScanResult>, state: &ScanState) {
 fn send_path_update(channel: &Channel<PartialScanResult>, state: &ScanState) {
     let (total_items, total_size) = state.get_stats();
     let current_path = state.get_current_path();
+    let disk_info = state.get_disk_info();
 
     let payload = PartialScanResult {
         nodes: Vec::new(),
@@ -369,7 +390,7 @@ fn send_path_update(channel: &Channel<PartialScanResult>, state: &ScanState) {
         total_size,
         is_complete: false,
         root_node: None,
-        disk_info: None,
+        disk_info,
         current_path: Some(current_path),
     };
 

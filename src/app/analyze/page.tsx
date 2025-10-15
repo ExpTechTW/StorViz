@@ -225,7 +225,8 @@ function AnalyzeContent() {
         // Create channel for streaming batches
         const onBatch = new Channel<{ nodes: FileNode[]; total_scanned: number; total_size: number; is_complete: boolean; root_node?: FileNode; disk_info?: { total_space: number; available_space: number; used_space: number }; current_path?: string }>()
         onBatch.onmessage = (message) => {
-          // Update progress
+          // Don't use disk_info for progress calculation as it's inaccurate
+          // Progress bar will show indeterminate state instead
           setScanProgress({
             currentPath: message.current_path || path,
             filesScanned: message.total_scanned,
@@ -544,25 +545,6 @@ function AnalyzeContent() {
           {scanProgress && scanProgress.filesScanned > 0 && (
             <div className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-6 space-y-4 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:shadow-lg group relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              {/* Progress bar - only show if we have estimated total (disk root) */}
-              {scanProgress.estimatedTotal > 0 && (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-muted-foreground">掃描進度</span>
-                    <span className="font-mono text-primary font-semibold">
-                      {Math.min(100, Math.round((scanProgress.scannedSize / scanProgress.estimatedTotal) * 100))}%
-                    </span>
-                  </div>
-                  <div className="h-3 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
-                      style={{
-                        width: `${Math.min(100, (scanProgress.scannedSize / scanProgress.estimatedTotal) * 100)}%`
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
 
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 relative z-10">
