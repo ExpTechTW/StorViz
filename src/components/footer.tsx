@@ -4,10 +4,25 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { Github, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { open } from '@tauri-apps/plugin-shell';
-import { useState } from 'react';
+import { getVersion } from '@tauri-apps/api/app';
+import { useState, useEffect } from 'react';
 
 export default function Footer() {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [version, setVersion] = useState('v0.1.0');
+
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const appVersion = await getVersion();
+        setVersion(`v${appVersion}`);
+      } catch (error) {
+        console.error('Failed to fetch app version:', error);
+      }
+    };
+
+    fetchVersion();
+  }, []);
 
   const handleGithubClick = async () => {
     try {
@@ -37,7 +52,7 @@ export default function Footer() {
               <div className="w-px h-3 bg-border" />
               <div className="flex items-center">
                 <p className="text-xs text-muted-foreground">
-                  v0.1.0
+                  {version}
                 </p>
               </div>
               <div className="w-px h-3 bg-border" />
@@ -54,7 +69,7 @@ export default function Footer() {
             <>
               <div className="flex items-center">
                 <p className="text-xs text-muted-foreground">
-                  v0.1.0
+                  {version}
                 </p>
               </div>
               <div className="w-px h-3 bg-border" />
