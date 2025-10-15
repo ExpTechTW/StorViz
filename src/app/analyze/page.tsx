@@ -208,7 +208,7 @@ function AnalyzeContent() {
         setScanProgress({ currentPath: path, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
 
         // Create channel for streaming batches
-        const onBatch = new Channel<{ nodes: FileNode[]; total_scanned: number; total_size: number; is_complete: boolean; root_node?: FileNode }>()
+        const onBatch = new Channel<{ nodes: FileNode[]; total_scanned: number; total_size: number; is_complete: boolean; root_node?: FileNode; disk_info?: { total_space: number; available_space: number; used_space: number } }>()
         onBatch.onmessage = (message) => {
           // Update progress
           setScanProgress({
@@ -223,7 +223,11 @@ function AnalyzeContent() {
             setData(message.root_node)
             setCurrentLevel(message.root_node)
             setBreadcrumb([message.root_node])
-            setDiskInfo(null)
+            setDiskInfo(message.disk_info ? {
+              totalSpace: message.disk_info.total_space,
+              availableSpace: message.disk_info.available_space,
+              usedSpace: message.disk_info.used_space
+            } : null)
             setIsLoading(false)
             setScanProgress(null)
           }
@@ -740,9 +744,12 @@ function AnalyzeContent() {
                                       }
                                     }}
                                   >
-                                    <title>{`${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${getFileTypeInfo(item.name, item.node.isDirectory).label}
-${item.name}
-Size: ${formatBytes(item.value)}`}</title>
+                                    <title>
+                                      {item.name === '可用空間' 
+                                        ? `💾 可用空間\n${formatBytes(item.value)}\n${diskInfo ? `總容量: ${formatBytes(diskInfo.totalSpace)}` : ''}`
+                                        : `${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${getFileTypeInfo(item.name, item.node.isDirectory).label}\n${item.name}\nSize: ${formatBytes(item.value)}`
+                                      }
+                                    </title>
                                   </circle>
                                 </g>
                               )
@@ -794,9 +801,12 @@ Size: ${formatBytes(item.value)}`}</title>
                                   }
                                 }}
                               >
-                                <title>{`${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${getFileTypeInfo(item.name, item.node.isDirectory).label}
-${item.name}
-Size: ${formatBytes(item.value)}`}</title>
+                                <title>
+                                  {item.name === '可用空間' 
+                                    ? `💾 可用空間\n${formatBytes(item.value)}\n${diskInfo ? `總容量: ${formatBytes(diskInfo.totalSpace)}` : ''}`
+                                    : `${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${getFileTypeInfo(item.name, item.node.isDirectory).label}\n${item.name}\nSize: ${formatBytes(item.value)}`
+                                  }
+                                </title>
                               </path>
                             )
                           })}
@@ -830,7 +840,10 @@ Size: ${formatBytes(item.value)}`}</title>
                 data-sector-id={sectorId}
                 onMouseEnter={() => handleHover(sectorId)}
                 onClick={() => handlePieClick(item, index)}
-                title={`${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${item.name} - ${formatBytes(item.value)}`}
+                title={item.name === '可用空間' 
+                  ? `💾 可用空間 - ${formatBytes(item.value)}${diskInfo ? `\n總容量: ${formatBytes(diskInfo.totalSpace)}` : ''}`
+                  : `${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${item.name} - ${formatBytes(item.value)}`
+                }
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <span className="text-sm flex-shrink-0">

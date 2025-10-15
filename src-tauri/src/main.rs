@@ -5,8 +5,10 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use std::collections::HashSet;
 use tauri::ipc::Channel;
 use rayon::prelude::*;
+use sysinfo::Disks;
 
 // Constants
 const BATCH_SIZE: usize = 10000;
@@ -29,6 +31,14 @@ struct PartialScanResult {
     total_size: u64,
     is_complete: bool,
     root_node: Option<FileNode>,
+    disk_info: Option<DiskInfo>,
+}
+
+#[derive(Clone, Serialize)]
+struct DiskInfo {
+    total_space: u64,
+    available_space: u64,
+    used_space: u64,
 }
 
 // Helper struct for shared state
@@ -37,6 +47,7 @@ struct ScanState {
     counter: Arc<Mutex<u64>>,
     scanned_size: Arc<Mutex<u64>>,
     batch_buffer: Arc<Mutex<Vec<FileNode>>>,
+    visited_paths: Arc<Mutex<HashSet<String>>>,
 }
 
 impl ScanState {
@@ -45,6 +56,7 @@ impl ScanState {
             counter: Arc::new(Mutex::new(0)),
             scanned_size: Arc::new(Mutex::new(0)),
             batch_buffer: Arc::new(Mutex::new(Vec::new())),
+            visited_paths: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -82,6 +94,105 @@ impl ScanState {
             Vec::new()
         }
     }
+
+    fn is_visited(&self, path: &str) -> bool {
+        if let Ok(visited) = self.visited_paths.lock() {
+            visited.contains(path)
+        } else {
+            false
+        }
+    }
+
+    fn mark_visited(&self, path: &str) {
+        if let Ok(mut visited) = self.visited_paths.lock() {
+            visited.insert(path.to_string());
+        }
+    }
+}
+
+// Get disk space information using sysinfo
+fn get_disk_info(path: &Path) -> Option<DiskInfo> {
+    let disks = Disks::new_with_refreshed_list();
+    
+    // Convert path to string for comparison
+    let path_str = path.to_string_lossy();
+    
+    // Find the disk that contains this path
+    // We need to find the most specific match (longest mount point)
+    let mut best_match: Option<(usize, DiskInfo)> = None;
+    
+    for disk in disks.list() {
+        let disk_path = disk.mount_point().to_string_lossy();
+        
+        // Debug output to see what we're comparing
+        println!("DEBUG: Comparing path '{}' with disk mount point '{}'", path_str, disk_path);
+        
+        // Check if the path is on this disk
+        if path_str.starts_with(&*disk_path) {
+            let disk_info = DiskInfo {
+                total_space: disk.total_space(),
+                available_space: disk.available_space(),
+                used_space: disk.total_space() - disk.available_space(),
+            };
+            
+            // Keep track of the longest (most specific) match
+            let mount_point_len = disk_path.len();
+            if best_match.is_none() || mount_point_len > best_match.as_ref().unwrap().0 {
+                best_match = Some((mount_point_len, disk_info));
+                println!("DEBUG: New best match with mount point '{}' (length: {})", disk_path, mount_point_len);
+            }
+        }
+    }
+    
+    if let Some((_, disk_info)) = best_match {
+        println!("DEBUG: Using best match for path '{}'", path_str);
+        Some(disk_info)
+    } else {
+        println!("DEBUG: No matching disk found for path '{}'", path_str);
+        None
+    }
+}
+
+// Check if path is a root directory
+fn is_root_directory(path: &str) -> bool {
+    #[cfg(unix)]
+    {
+        // Check for actual root directory
+        if path == "/" || path == "\\" {
+            return true;
+        }
+        
+        // Check for macOS volume mount points (e.g., /Volumes/YuYu1015)
+        if path.starts_with("/Volumes/") {
+            let parts: Vec<&str> = path.split('/').collect();
+            // Should be exactly ["", "Volumes", "VolumeName"]
+            if parts.len() == 3 && parts[0] == "" && parts[1] == "Volumes" && !parts[2].is_empty() {
+                return true;
+            }
+        }
+        
+        // Check for Linux mount points (e.g., /mnt/disk, /media/user/disk)
+        if path.starts_with("/mnt/") || path.starts_with("/media/") {
+            let parts: Vec<&str> = path.split('/').collect();
+            // Should be exactly ["", "mnt", "diskname"] or ["", "media", "user", "diskname"]
+            if (parts.len() == 3 && parts[0] == "" && parts[1] == "mnt" && !parts[2].is_empty()) ||
+               (parts.len() == 4 && parts[0] == "" && parts[1] == "media" && !parts[2].is_empty() && !parts[3].is_empty()) {
+                return true;
+            }
+        }
+        
+        false
+    }
+    
+    #[cfg(windows)]
+    {
+        path.len() == 3 && path.ends_with(":\\") // e.g., "C:\"
+    }
+    
+    #[cfg(not(any(unix, windows)))]
+    {
+        false
+    }
 }
 
 #[tauri::command]
@@ -96,16 +207,33 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
         let state = ScanState::new();
         let root_path = Path::new(&path);
         
+        // Get disk info for root directory scans
+        let disk_info = if is_root_directory(&path) {
+            println!("DEBUG: Detected root directory: {}", path);
+            let info = get_disk_info(root_path);
+            if let Some(ref disk) = info {
+                println!("DEBUG: Disk info - Total: {} GB, Available: {} GB", 
+                    disk.total_space / (1024*1024*1024), 
+                    disk.available_space / (1024*1024*1024));
+            } else {
+                println!("DEBUG: Failed to get disk info for path: {}", path);
+            }
+            info
+        } else {
+            println!("DEBUG: Not a root directory: {}", path);
+            None
+        };
+        
         if let Ok(root_node) = scan_directory_recursive(root_path, &on_batch, &state) {
             let limited_root = build_limited_depth_node(&root_node, MAX_DEPTH);
-            send_final_batch(&on_batch, &state, limited_root);
+            send_final_batch(&on_batch, &state, limited_root, disk_info);
         }
     });
 
     Ok(())
 }
 
-fn send_final_batch(channel: &Channel<PartialScanResult>, state: &ScanState, root_node: FileNode) {
+fn send_final_batch(channel: &Channel<PartialScanResult>, state: &ScanState, root_node: FileNode, disk_info: Option<DiskInfo>) {
     let (total_items, total_size) = state.get_stats();
     let remaining_nodes = state.clear_buffer();
     
@@ -115,6 +243,7 @@ fn send_final_batch(channel: &Channel<PartialScanResult>, state: &ScanState, roo
         total_size,
         is_complete: true,
         root_node: Some(root_node),
+        disk_info,
     };
     
     let _ = channel.send(payload);
@@ -130,6 +259,7 @@ fn send_batch(channel: &Channel<PartialScanResult>, state: &ScanState) {
         total_size,
         is_complete: false,
         root_node: None,
+        disk_info: None,
     };
     
     let _ = channel.send(payload);
@@ -171,11 +301,38 @@ fn scan_directory_recursive(
     channel: &Channel<PartialScanResult>,
     state: &ScanState,
 ) -> Result<FileNode, String> {
+    let path_str = path.to_string_lossy().to_string();
+    
+    // Check if we've already visited this path (prevents symlink loops)
+    if state.is_visited(&path_str) {
+        return Ok(FileNode {
+            name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
+            size: 0,
+            path: path_str,
+            children: None,
+            is_directory: false,
+        });
+    }
+    
+    // Mark as visited
+    state.mark_visited(&path_str);
+    
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-    let path_str = path.to_string_lossy().to_string();
 
     state.increment_counter();
+
+    // Skip symlinks entirely - they are virtual references and shouldn't be counted
+    if metadata.file_type().is_symlink() {
+        // Return a minimal node with size 0, but don't add to buffer to avoid cluttering
+        return Ok(FileNode {
+            name,
+            size: 0,
+            path: path_str,
+            children: None,
+            is_directory: false,
+        });
+    }
 
     if metadata.is_file() {
         let file_size = metadata.len();
@@ -200,7 +357,47 @@ fn scan_directory_recursive(
     if let Ok(entries) = fs::read_dir(path) {
         let entries_vec: Vec<_> = entries.flatten().collect();
         
-        let children: Vec<FileNode> = entries_vec
+        // Filter out problematic directories and symlinks
+        let filtered_entries: Vec<_> = entries_vec
+            .into_iter()
+            .filter(|entry| {
+                let path = entry.path();
+                let path_str = path.to_string_lossy();
+                
+                // Skip symlinks entirely
+                if let Ok(metadata) = fs::metadata(&path) {
+                    if metadata.file_type().is_symlink() {
+                        return false;
+                    }
+                }
+                
+                // Skip system directories that cause issues
+                #[cfg(unix)]
+                {
+                    if path_str.contains("/System/Volumes/Data") ||
+                       path_str.contains("/private/var/vm") ||
+                       path_str.contains("/dev") ||
+                       path_str.contains("/proc") ||
+                       path_str.contains("/sys") {
+                        return false;
+                    }
+                }
+                
+                #[cfg(windows)]
+                {
+                    if path_str.contains("\\System Volume Information") ||
+                       path_str.contains("\\$Recycle.Bin") ||
+                       path_str.contains("\\Windows\\System32\\config") {
+                        return false;
+                    }
+                }
+                
+                // Skip if already visited (additional safety check)
+                !state.is_visited(&path_str)
+            })
+            .collect();
+        
+        let children: Vec<FileNode> = filtered_entries
             .par_iter()
             .filter_map(|entry| {
                 scan_directory_recursive(&entry.path(), channel, state).ok()
