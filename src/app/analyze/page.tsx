@@ -324,9 +324,12 @@ function AnalyzeContent() {
         setScanElapsedTime(0)
         setScanCompleteTime(null)
 
+        // Store startTime in ref for accurate timing
+        const startTimeRef = { current: startTime }
+
         // Update elapsed time every 100ms
         elapsedTimeIntervalRef.current = setInterval(() => {
-          setScanElapsedTime(Date.now() - startTime)
+          setScanElapsedTime(Date.now() - startTimeRef.current)
         }, 100)
 
         // Create channel for streaming batches
@@ -362,15 +365,16 @@ function AnalyzeContent() {
               return
             }
 
-            // Stop timer
+            // Stop timer and record completion time
             if (elapsedTimeIntervalRef.current) {
               clearInterval(elapsedTimeIntervalRef.current)
               elapsedTimeIntervalRef.current = null
             }
 
-            // Record completion time
-            const completionTime = Date.now() - (scanStartTime || Date.now())
+            // Calculate final completion time directly
+            const completionTime = Date.now() - startTimeRef.current
             setScanCompleteTime(completionTime)
+            setScanElapsedTime(completionTime)
 
             // Rebuild tree from cached compact nodes
             const finalTree = rebuildTreeFromCompactNodes(message.root_node, compactNodesCache.current)
