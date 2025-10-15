@@ -182,25 +182,16 @@ export default function HomePage() {
         {/* 卡片切換容器 */}
         <div className="relative" style={{ minHeight: '200px' }}>
           {/* Statistics & Features - 第一組 */}
-          <div className={`space-y-3 ${!selectedPath ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-75 pointer-events-none invisible'}`} style={{ transition: 'opacity 0.5s ease-in-out, transform 0.5s ease-in-out' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 200px)', gap: '12px', justifyContent: 'center' }}>
+          <div className={`${!selectedPath ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-75 pointer-events-none invisible'}`} style={{ transition: 'opacity 0.5s ease-in-out, transform 0.5s ease-in-out' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 200px)', gap: '12px', justifyContent: 'center', gridTemplateRows: 'auto auto auto' }}>
+              {/* 第 1-4 格：前 4 個統計卡片 */}
               <StatsDisplay />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 200px)', gap: '12px', justifyContent: 'center' }}>
-              {features.map((feature, index) => (
-                <FeatureCard
-                  key={index}
-                  icon={feature.icon}
-                  title={feature.title}
-                  description={feature.description}
-                />
-              ))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
+
+              {/* 第 5 格：瀏覽資料夾按鈕（正中間） */}
               <button
                 onClick={handleSelectFolder}
                 className="bg-gradient-to-br from-primary/30 to-primary/15 backdrop-blur-md rounded-lg border-2 border-primary/60 p-3 flex items-center gap-3 hover:from-primary/40 hover:to-primary/20 hover:border-primary/80 transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-primary/40 group relative overflow-hidden"
-                style={{ width: '200px', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}
+                style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite', gridColumn: '2', gridRow: '2' }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-shimmer"></div>
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -212,6 +203,16 @@ export default function HomePage() {
                   <p className="text-[10px] text-muted-foreground group-hover:text-foreground/80 transition-colors">選擇分析目標</p>
                 </div>
               </button>
+
+              {/* 第 6-9 格：功能卡片 */}
+              {features.map((feature, index) => (
+                <FeatureCard
+                  key={index}
+                  icon={feature.icon}
+                  title={feature.title}
+                  description={feature.description}
+                />
+              ))}
             </div>
           </div>
 

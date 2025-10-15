@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BarChart3, FileStack, HardDrive } from 'lucide-react'
+import { BarChart3, FileStack, HardDrive, Trash2, Database } from 'lucide-react'
 import { getStats, type ScanStats } from '@/lib/statsStorage'
 import { useCountAnimation } from '@/hooks/useCountAnimation'
 
@@ -122,6 +122,8 @@ export function StatsDisplay() {
     totalFiles: 0,
     totalSize: 0,
     lastScanDate: '',
+    totalDeleted: 0,
+    totalDeletedSize: 0,
   })
 
   useEffect(() => {
@@ -173,6 +175,24 @@ export function StatsDisplay() {
         unit={getBytesUnit(stats.totalSize)}
         formatValue={formatBytes}
         color="#ec4899"
+      />
+
+      <StatCard
+        icon={<Trash2 className="w-3 h-3" />}
+        label="累計刪除檔案"
+        value={stats.totalDeleted}
+        unit={getCountUnit(stats.totalDeleted)}
+        formatValue={formatCount}
+        color="#f59e0b"
+      />
+
+      <StatCard
+        icon={<Database className="w-3 h-3" />}
+        label="累計釋放空間"
+        value={stats.totalDeletedSize}
+        unit={getBytesUnit(stats.totalDeletedSize)}
+        formatValue={formatBytes}
+        color="#10b981"
       />
     </>
   )

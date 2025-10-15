@@ -458,6 +458,111 @@ fn cancel_scan() -> Result<(), String> {
     Err("No active scan to cancel".to_string())
 }
 
+// Deletion progress message
+#[derive(Clone, Serialize)]
+struct DeletionProgress {
+    current: usize,
+    total: usize,
+    current_path: String,
+    success: bool,
+    completed: bool,
+    deleted_size: Option<u64>,
+    deleted_count: Option<usize>,
+}
+
+#[tauri::command]
+async fn delete_files_batch(paths: Vec<String>, on_progress: Channel<DeletionProgress>) -> Result<(), String> {
+    let total = paths.len();
+
+    // Spawn background deletion task
+    std::thread::spawn(move || {
+        let mut deleted_count = 0usize;
+        let mut deleted_size = 0u64;
+
+        for (index, path) in paths.iter().enumerate() {
+            let path_obj = Path::new(path);
+            let current_path = path.clone();
+
+            // Calculate size before deletion
+            let size_before = if path_obj.exists() {
+                if path_obj.is_file() {
+                    path_obj.size_on_disk().unwrap_or(0)
+                } else if path_obj.is_dir() {
+                    calculate_dir_size(path_obj)
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+
+            // Send progress update
+            let progress = DeletionProgress {
+                current: index + 1,
+                total,
+                current_path: current_path.clone(),
+                success: false,
+                completed: false,
+                deleted_size: None,
+                deleted_count: None,
+            };
+            let _ = on_progress.send(progress);
+
+            // Attempt deletion
+            let deletion_result = if path_obj.is_file() {
+                fs::remove_file(path_obj)
+            } else if path_obj.is_dir() {
+                fs::remove_dir_all(path_obj)
+            } else {
+                Err(std::io::Error::new(std::io::ErrorKind::Other, "Not a file or directory"))
+            };
+
+            match deletion_result {
+                Ok(_) => {
+                    deleted_count += 1;
+                    deleted_size += size_before;
+                    println!("✅ Deleted: {} (size: {} bytes)", current_path, size_before);
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to delete {}: {}", current_path, e);
+                }
+            }
+        }
+
+        // Send completion message
+        let completion = DeletionProgress {
+            current: total,
+            total,
+            current_path: String::from("完成"),
+            success: true,
+            completed: true,
+            deleted_size: Some(deleted_size),
+            deleted_count: Some(deleted_count),
+        };
+        let _ = on_progress.send(completion);
+    });
+
+    Ok(())
+}
+
+// Helper function to calculate directory size recursively
+fn calculate_dir_size(path: &Path) -> u64 {
+    let mut total_size = 0u64;
+
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            if entry_path.is_file() {
+                total_size += entry_path.size_on_disk().unwrap_or(0);
+            } else if entry_path.is_dir() {
+                total_size += calculate_dir_size(&entry_path);
+            }
+        }
+    }
+
+    total_size
+}
+
 // Convert FileNode to compact format (removes path, uses short keys)
 fn to_compact_node(node: &FileNode) -> CompactFileNode {
     CompactFileNode {
@@ -819,7 +924,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![scan_directory_streaming, cancel_scan])
+        .invoke_handler(tauri::generate_handler![scan_directory_streaming, cancel_scan, delete_files_batch])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

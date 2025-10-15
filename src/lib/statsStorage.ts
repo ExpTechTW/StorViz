@@ -5,6 +5,8 @@ export interface ScanStats {
   totalFiles: number // 累計掃描檔案數量
   totalSize: number // 累計掃描資料量（bytes）
   lastScanDate: string // 最後掃描時間
+  totalDeleted: number // 累計刪除檔案數量
+  totalDeletedSize: number // 累計刪除資料量（bytes）
 }
 
 const STATS_KEY = 'storviz-scan-stats'
@@ -17,13 +19,24 @@ export function getStats(): ScanStats {
       totalFiles: 0,
       totalSize: 0,
       lastScanDate: '',
+      totalDeleted: 0,
+      totalDeletedSize: 0,
     }
   }
 
   try {
     const stored = localStorage.getItem(STATS_KEY)
     if (stored) {
-      return JSON.parse(stored)
+      const parsed = JSON.parse(stored)
+      // Ensure backward compatibility by adding missing fields
+      return {
+        totalScans: parsed.totalScans || 0,
+        totalFiles: parsed.totalFiles || 0,
+        totalSize: parsed.totalSize || 0,
+        lastScanDate: parsed.lastScanDate || '',
+        totalDeleted: parsed.totalDeleted || 0,
+        totalDeletedSize: parsed.totalDeletedSize || 0,
+      }
     }
   } catch (error) {
     console.error('Failed to load stats:', error)
@@ -34,6 +47,8 @@ export function getStats(): ScanStats {
     totalFiles: 0,
     totalSize: 0,
     lastScanDate: '',
+    totalDeleted: 0,
+    totalDeletedSize: 0,
   }
 }
 
@@ -48,6 +63,8 @@ export function updateStats(filesScanned: number, sizeScanned: number): void {
       totalFiles: currentStats.totalFiles + filesScanned,
       totalSize: currentStats.totalSize + sizeScanned,
       lastScanDate: new Date().toISOString(),
+      totalDeleted: currentStats.totalDeleted,
+      totalDeletedSize: currentStats.totalDeletedSize,
     }
     localStorage.setItem(STATS_KEY, JSON.stringify(updatedStats))
 
@@ -55,6 +72,26 @@ export function updateStats(filesScanned: number, sizeScanned: number): void {
     window.dispatchEvent(new Event('stats-updated'))
   } catch (error) {
     console.error('Failed to update stats:', error)
+  }
+}
+
+// 更新刪除統計數據
+export function updateDeleteStats(filesDeleted: number, sizeDeleted: number): void {
+  if (typeof window === 'undefined') return
+
+  try {
+    const currentStats = getStats()
+    const updatedStats: ScanStats = {
+      ...currentStats,
+      totalDeleted: currentStats.totalDeleted + filesDeleted,
+      totalDeletedSize: currentStats.totalDeletedSize + sizeDeleted,
+    }
+    localStorage.setItem(STATS_KEY, JSON.stringify(updatedStats))
+
+    // 觸發自定義事件以通知組件更新
+    window.dispatchEvent(new Event('stats-updated'))
+  } catch (error) {
+    console.error('Failed to update delete stats:', error)
   }
 }
 
