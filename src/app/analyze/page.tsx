@@ -74,55 +74,64 @@ function formatBytesCompact(bytes: number): string {
   }
 }
 
-function getFileIcon(fileName: string, isDirectory: boolean) {
-  if (isDirectory) return '📁'
+interface FileTypeInfo {
+  icon: string
+  label: string
+}
+
+function getFileTypeInfo(fileName: string, isDirectory: boolean): FileTypeInfo {
+  if (isDirectory) {
+    return { icon: '📁', label: 'Folder' }
+  }
 
   const ext = fileName.split('.').pop()?.toLowerCase() || ''
 
   // 圖片
-  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'].includes(ext)) return '🖼️'
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'].includes(ext)) {
+    return { icon: '🖼️', label: 'Image' }
+  }
   // 影片
-  if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v'].includes(ext)) return '🎬'
+  if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v'].includes(ext)) {
+    return { icon: '🎬', label: 'Video' }
+  }
   // 音訊
-  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a'].includes(ext)) return '🎵'
+  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a'].includes(ext)) {
+    return { icon: '🎵', label: 'Audio' }
+  }
   // 壓縮檔
-  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso'].includes(ext)) return '📦'
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso'].includes(ext)) {
+    return { icon: '📦', label: 'Archive' }
+  }
   // 程式碼
-  if (['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'c', 'cpp', 'cs', 'go', 'rs', 'php', 'rb', 'swift', 'kt'].includes(ext)) return '💻'
+  if (['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'c', 'cpp', 'cs', 'go', 'rs', 'php', 'rb', 'swift', 'kt'].includes(ext)) {
+    return { icon: '💻', label: 'Code' }
+  }
   // 網頁
-  if (['html', 'htm', 'css', 'scss', 'sass', 'less'].includes(ext)) return '🌐'
+  if (['html', 'htm', 'css', 'scss', 'sass', 'less'].includes(ext)) {
+    return { icon: '🌐', label: 'Web' }
+  }
   // 文件
-  if (['txt', 'md', 'doc', 'docx', 'pdf', 'rtf'].includes(ext)) return '📄'
+  if (['txt', 'md', 'doc', 'docx', 'pdf', 'rtf'].includes(ext)) {
+    return { icon: '📄', label: 'Document' }
+  }
   // 試算表
-  if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊'
+  if (['xls', 'xlsx', 'csv'].includes(ext)) {
+    return { icon: '📊', label: 'Spreadsheet' }
+  }
   // 資料庫
-  if (['db', 'sqlite', 'sql', 'mdb'].includes(ext)) return '🗄️'
+  if (['db', 'sqlite', 'sql', 'mdb'].includes(ext)) {
+    return { icon: '🗄️', label: 'Database' }
+  }
   // 設定檔
-  if (['json', 'yaml', 'yml', 'toml', 'ini', 'conf', 'config'].includes(ext)) return '⚙️'
+  if (['json', 'yaml', 'yml', 'toml', 'ini', 'conf', 'config'].includes(ext)) {
+    return { icon: '⚙️', label: 'Config' }
+  }
   // 執行檔
-  if (['exe', 'msi', 'app', 'dmg', 'deb', 'rpm'].includes(ext)) return '⚡'
+  if (['exe', 'msi', 'app', 'dmg', 'deb', 'rpm'].includes(ext)) {
+    return { icon: '⚡', label: 'Executable' }
+  }
 
-  return '📄'
-}
-
-function getFileTypeLabel(fileName: string, isDirectory: boolean): string {
-  if (isDirectory) return 'Folder'
-
-  const ext = fileName.split('.').pop()?.toLowerCase() || ''
-
-  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'].includes(ext)) return 'Image'
-  if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v'].includes(ext)) return 'Video'
-  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a'].includes(ext)) return 'Audio'
-  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso'].includes(ext)) return 'Archive'
-  if (['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'c', 'cpp', 'cs', 'go', 'rs', 'php', 'rb', 'swift', 'kt'].includes(ext)) return 'Code'
-  if (['html', 'htm', 'css', 'scss', 'sass', 'less'].includes(ext)) return 'Web'
-  if (['txt', 'md', 'doc', 'docx', 'pdf', 'rtf'].includes(ext)) return 'Document'
-  if (['xls', 'xlsx', 'csv'].includes(ext)) return 'Spreadsheet'
-  if (['db', 'sqlite', 'sql', 'mdb'].includes(ext)) return 'Database'
-  if (['json', 'yaml', 'yml', 'toml', 'ini', 'conf', 'config'].includes(ext)) return 'Config'
-  if (['exe', 'msi', 'app', 'dmg', 'deb', 'rpm'].includes(ext)) return 'Executable'
-
-  return 'File'
+  return { icon: '📄', label: 'File' }
 }
 
 function AnalyzeContent() {
@@ -133,13 +142,41 @@ function AnalyzeContent() {
   const [data, setData] = useState<FileNode | null>(null)
   const [currentLevel, setCurrentLevel] = useState<FileNode | null>(null)
   const [breadcrumb, setBreadcrumb] = useState<FileNode[]>([])
-  const [activePath, setActivePath] = useState<string | null>(null)
+  const [hoveredPath, setHoveredPath] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [scanProgress, setScanProgress] = useState<{ currentPath: string; filesScanned: number; scannedSize: number; estimatedTotal: number } | null>(null)
   const [diskInfo, setDiskInfo] = useState<{ totalSpace: number; availableSpace: number; usedSpace: number } | null>(null)
 
   // Use ref to track component state
   const scanningRef = useRef(false)
+
+  // Hover management - triggered by individual sectors
+  const handleSectorMouseEnter = (path: string) => {
+    setHoveredPath(path)
+  }
+
+  const handleChartMouseLeave = () => {
+    setHoveredPath(null)
+  }
+
+  const handleFileListMouseMove = (event: React.MouseEvent) => {
+    const target = event.target as HTMLElement
+    const fileItem = target.closest('.file-item') as HTMLElement
+    if (fileItem) {
+      const path = fileItem.getAttribute('data-path')
+      if (path) {
+        setHoveredPath(path)
+      }
+    } else {
+      // Clear hover when moving to empty space in file list
+      setHoveredPath(null)
+    }
+  }
+
+  const handleFileListMouseLeave = () => {
+    setHoveredPath(null)
+  }
+
 
   useEffect(() => {
     if (!path) {
@@ -409,7 +446,6 @@ function AnalyzeContent() {
     if (clickedNode && clickedNode.isDirectory && clickedNode.children) {
       setCurrentLevel(clickedNode)
       setBreadcrumb([...breadcrumb, clickedNode])
-      setActivePath(null)
     }
   }
 
@@ -483,14 +519,6 @@ function AnalyzeContent() {
     )
   }
 
-  const handleGoBack = () => {
-    if (breadcrumb.length > 1) {
-      const newBreadcrumb = breadcrumb.slice(0, -1)
-      setBreadcrumb(newBreadcrumb)
-      setCurrentLevel(newBreadcrumb[newBreadcrumb.length - 1])
-      setActivePath(null)
-    }
-  }
 
   // Generate breadcrumb path segments
   const generateBreadcrumbSegments = () => {
@@ -554,10 +582,8 @@ function AnalyzeContent() {
       const newBreadcrumb = breadcrumb.slice(0, targetIndex + 1)
       setBreadcrumb(newBreadcrumb)
       setCurrentLevel(targetNode)
-      setActivePath(null)
     }
   }
-
 
   return (
     <div className="w-[840px] h-[630px] bg-background overflow-hidden flex flex-col">
@@ -571,24 +597,22 @@ function AnalyzeContent() {
           }
         }
         
-        /* Chart hover effects - only when hovering directly on chart sectors */
-        .chart-sector:hover {
+        /* JavaScript controlled hover effects */
+        .chart-sector.hovered {
           filter: brightness(1.1) drop-shadow(0 0 4px rgba(0,0,0,0.2)) !important;
         }
         
-        /* Dim other sectors when hovering on chart */
-        .chart-container:hover .chart-sector:not(:hover) {
+        .chart-sector.dimmed {
           opacity: 0.2 !important;
         }
         
-        /* Dim sectors when File List item is hovered */
-        .chart-sector.dimmed-sector {
-          opacity: 0.2 !important;
+        .file-item.hovered {
+          background-color: rgba(var(--primary-rgb), 0.05) !important;
+          border-color: rgba(var(--primary-rgb), 0.2) !important;
         }
         
-        /* Brighten active sector when File List item is hovered */
-        .chart-sector.active-sector {
-          filter: brightness(1.1) drop-shadow(0 0 4px rgba(0,0,0,0.2)) !important;
+        .file-item.dimmed {
+          opacity: 0.3 !important;
         }
         
       `}</style>
@@ -660,6 +684,7 @@ function AnalyzeContent() {
                   opacity: 1,
                   transform: 'scale(1)'
                 }}
+                onMouseLeave={handleChartMouseLeave}
               >
                     {/* Center size display */}
                     <text
@@ -704,26 +729,22 @@ function AnalyzeContent() {
                                     fill="transparent"
                                     strokeWidth={layer.outerRadius - layer.innerRadius}
                                     stroke={item.color}
-                                    className={`chart-sector ${activePath === item.path ? 'active-sector' : ''} ${activePath !== null && activePath !== item.path ? 'dimmed-sector' : ''}`}
+                                    className={`chart-sector ${hoveredPath === item.path ? 'hovered' : ''} ${hoveredPath !== null && hoveredPath !== item.path ? 'dimmed' : ''}`}
+                                    data-path={item.path}
                                     style={{
                                       cursor: 'pointer',
                                       transition: 'opacity 0.2s ease, filter 0.2s ease',
                                       animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                     }}
+                                    onMouseEnter={() => handleSectorMouseEnter(item.path)}
                                     onClick={() => {
                                       if (item.node.isDirectory && item.node.children) {
                                         setCurrentLevel(item.node)
                                         setBreadcrumb([...breadcrumb, item.node])
                                       }
                                     }}
-                                    onMouseEnter={() => {
-                                      setActivePath(item.path)
-                                    }}
-                                    onMouseLeave={() => {
-                                      setActivePath(null)
-                                    }}
                                   >
-                                    <title>{`${getFileIcon(item.name, item.node.isDirectory)} ${getFileTypeLabel(item.name, item.node.isDirectory)}
+                                    <title>{`${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${getFileTypeInfo(item.name, item.node.isDirectory).label}
 ${item.name}
 Size: ${formatBytes(item.value)}`}</title>
                                   </circle>
@@ -763,26 +784,22 @@ Size: ${formatBytes(item.value)}`}</title>
                                 fill={item.color}
                                 stroke="rgba(0,0,0,0.1)"
                                 strokeWidth={0.5}
-                                className={`chart-sector ${activePath === item.path ? 'active-sector' : ''} ${activePath !== null && activePath !== item.path ? 'dimmed-sector' : ''}`}
+                                className={`chart-sector ${hoveredPath === item.path ? 'hovered' : ''} ${hoveredPath !== null && hoveredPath !== item.path ? 'dimmed' : ''}`}
+                                data-path={item.path}
                                 style={{
                                   cursor: 'pointer',
                                   transition: 'opacity 0.2s ease, filter 0.2s ease',
                                   animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                 }}
+                                onMouseEnter={() => handleSectorMouseEnter(item.path)}
                                 onClick={() => {
                                   if (item.node.isDirectory && item.node.children) {
                                     setCurrentLevel(item.node)
                                     setBreadcrumb([...breadcrumb, item.node])
                                   }
                                 }}
-                                onMouseEnter={() => {
-                                  setActivePath(item.path)
-                                }}
-                                onMouseLeave={() => {
-                                  setActivePath(null)
-                                }}
                               >
-                                <title>{`${getFileIcon(item.name, item.node.isDirectory)} ${getFileTypeLabel(item.name, item.node.isDirectory)}
+                                <title>{`${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${getFileTypeInfo(item.name, item.node.isDirectory).label}
 ${item.name}
 Size: ${formatBytes(item.value)}`}</title>
                               </path>
@@ -805,25 +822,22 @@ Size: ${formatBytes(item.value)}`}</title>
             <span className="w-0.5 h-3 bg-primary rounded-full"></span>
             Files & Folders
           </h2>
-          <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-0.5">
+          <div 
+            className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-0.5 file-list"
+            onMouseMove={handleFileListMouseMove}
+            onMouseLeave={handleFileListMouseLeave}
+          >
             {chartData.map((item, index) => (
               <div
                 key={item.path}
-                className={`flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent ${
-                  activePath === item.path 
-                    ? 'bg-primary/5 border-primary/20' 
-                    : activePath !== null && activePath !== item.path
-                    ? 'opacity-30'
-                    : 'hover:bg-muted/80 hover:border-muted-foreground/20'
-                }`}
+                className={`flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent file-item ${hoveredPath === item.path ? 'hovered' : ''} ${hoveredPath !== null && hoveredPath !== item.path ? 'dimmed' : ''}`}
+                data-path={item.path}
                 onClick={() => handlePieClick(item, index)}
-                onMouseEnter={() => setActivePath(item.path)}
-                onMouseLeave={() => setActivePath(null)}
-                title={`${getFileIcon(item.name, item.node.isDirectory)} ${item.name} - ${formatBytes(item.value)}`}
+                title={`${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${item.name} - ${formatBytes(item.value)}`}
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <span className="text-sm flex-shrink-0">
-                    {getFileIcon(item.name, item.node.isDirectory)}
+                    {getFileTypeInfo(item.name, item.node.isDirectory).icon}
                   </span>
                   <div
                     className="w-2 h-2 rounded-full flex-shrink-0"

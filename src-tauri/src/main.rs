@@ -30,23 +30,17 @@ struct PartialScanResult {
 
 #[tauri::command]
 async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanResult>) -> Result<(), String> {
-    println!("🔍 開始流式掃描目錄: {}", path);
-
     let root_path = Path::new(&path);
 
     if !root_path.exists() {
-        println!("❌ 路徑不存在: {}", root_path.display());
         return Err("路徑不存在".to_string());
     }
-
-    println!("🚀 開始完整掃描（流式傳輸）...");
 
     // Clone variables for the background task
     let path_clone = path.clone();
 
     // Spawn blocking task in a separate thread to avoid blocking the event loop
     std::thread::spawn(move || {
-        println!("🧵 掃描線程已啟動");
         let root_path = Path::new(&path_clone);
         let counter = Arc::new(Mutex::new(0u64));
         let scanned_size = Arc::new(Mutex::new(0u64));
@@ -72,7 +66,6 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
                 let total_size = *scanned_size.lock().unwrap();
 
                 if !buffer.is_empty() {
-                    println!("📤 發送最後一批: {} 個項目", buffer.len());
                     let payload = PartialScanResult {
                         nodes: buffer.clone(),
                         total_scanned: total_items,
@@ -82,14 +75,10 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
                     };
 
                     // Send via channel
-                    match on_batch.send(payload) {
-                        Ok(_) => println!("✅ 最後一批事件發送成功"),
-                        Err(e) => println!("❌ 最後一批事件發送失敗: {:?}", e),
-                    }
+                    let _ = on_batch.send(payload);
                     buffer.clear();
                 } else {
                     // Send completion message with root node even if buffer is empty
-                    println!("📤 發送完成訊息（包含根節點）");
                     let payload = PartialScanResult {
                         nodes: Vec::new(),
                         total_scanned: total_items,
@@ -98,25 +87,14 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
                         root_node: Some(limited_root),
                     };
 
-                    match on_batch.send(payload) {
-                        Ok(_) => println!("✅ 完成訊息發送成功"),
-                        Err(e) => println!("❌ 完成訊息發送失敗: {:?}", e),
-                    }
+                    let _ = on_batch.send(payload);
                 }
             }
 
-            let total_items = *counter.lock().unwrap();
-            let total_size = *scanned_size.lock().unwrap();
-            println!("✅ 掃描完成！");
-            println!("📊 統計資訊:");
-            println!("   - 掃描項目: {} 個", total_items);
-            println!("   - 總大小: {} bytes ({:.2} GB)", total_size, total_size as f64 / (1024.0 * 1024.0 * 1024.0));
         }
-        println!("🧵 掃描線程已結束");
     });
 
     // Return immediately, scanning happens in background
-    println!("✅ 背景掃描已啟動");
     Ok(())
 }
 
@@ -208,7 +186,6 @@ fn scan_dir_streaming_channel(
                 let total_items = *counter.lock().unwrap();
                 let total_size = *scanned_size.lock().unwrap();
 
-                println!("📤 發送一批: {} 個項目 (總計: {} 個)", buffer.len(), total_items);
                 let payload = PartialScanResult {
                     nodes: buffer.clone(),
                     total_scanned: total_items,
@@ -218,10 +195,7 @@ fn scan_dir_streaming_channel(
                 };
 
                 // Send via channel
-                match channel.send(payload) {
-                    Ok(_) => println!("✅ 批次發送成功"),
-                    Err(e) => println!("❌ 批次發送失敗: {:?}", e),
-                }
+                let _ = channel.send(payload);
                 buffer.clear();
             }
         }
