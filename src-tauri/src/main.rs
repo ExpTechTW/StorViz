@@ -10,10 +10,11 @@ use tauri::ipc::Channel;
 use rayon::prelude::*;
 use sysinfo::Disks;
 use std::os::unix::fs::MetadataExt;
+use filesize::PathExt;
 
 // Constants
 const BATCH_SIZE: usize = 10000;
-const MAX_DEPTH: usize = 10;
+const MAX_DEPTH: usize = 100; // Increased depth limit
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FileNode {
@@ -334,10 +335,35 @@ fn scan_directory_recursive(
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
     state.increment_counter();
 
-    // Skip symlinks entirely - they are virtual references and shouldn't be counted
+    // Handle symlinks by following them
     if metadata.file_type().is_symlink() {
-        println!("DEBUG: Skipping symlink: {}", path_str);
-        // Return a minimal node with size 0, but don't add to buffer to avoid cluttering
+        println!("DEBUG: Following symlink: {}", path_str);
+        // Try to follow the symlink
+        if let Ok(target_path) = fs::read_link(path) {
+            if let Ok(target_metadata) = fs::metadata(&target_path) {
+                if target_metadata.is_file() {
+                    // Use filesize to get actual disk usage for symlinked files
+                    let file_size = target_path.size_on_disk().unwrap_or(0);
+                    println!("DEBUG: Symlink '{}' points to file of actual size: {} bytes", path_str, file_size);
+                    state.add_size(file_size);
+                    
+                    return Ok(FileNode {
+                        name,
+                        size: file_size,
+                        path: path_str,
+                        children: None,
+                        is_directory: false,
+                    });
+                } else if target_metadata.is_dir() {
+                    // For directory symlinks, we'll scan the target directory
+                    println!("DEBUG: Symlink '{}' points to directory, scanning target", path_str);
+                    return scan_directory_recursive(&target_path, channel, state);
+                }
+            }
+        }
+        
+        // If we can't follow the symlink, return size 0
+        println!("DEBUG: Cannot follow symlink: {}", path_str);
         return Ok(FileNode {
             name,
             size: 0,
@@ -348,23 +374,17 @@ fn scan_directory_recursive(
     }
 
     if metadata.is_file() {
-        let file_size = metadata.len();
+        // Use filesize to get actual disk usage (handles sparse files correctly)
+        let file_size = path.size_on_disk().unwrap_or(0);
         
-        // Safety check: skip files larger than 1GB (might be virtual files or errors)
-        if file_size > 1_000_000_000 {
-            println!("DEBUG: Skipping large file '{}' size: {} bytes (>{})", name, file_size, 1_000_000_000);
-            return Ok(FileNode {
-                name,
-                size: 0,
-                path: path_str,
-                children: None,
-                is_directory: false,
-            });
+        // Log very large files (>100MB) for debugging
+        if file_size > 100_000_000 {
+            println!("DEBUG: Very large file '{}' actual size: {} bytes", name, file_size);
         }
         
         // Only log large files (>10MB) to reduce noise
         if file_size > 10_000_000 {
-            println!("DEBUG: Large file '{}' size: {} bytes", name, file_size);
+            println!("DEBUG: Large file '{}' actual size: {} bytes", name, file_size);
         }
         state.add_size(file_size);
 
@@ -387,44 +407,8 @@ fn scan_directory_recursive(
     if let Ok(entries) = fs::read_dir(path) {
         let entries_vec: Vec<_> = entries.flatten().collect();
         
-        // Filter out problematic directories and symlinks
-        let filtered_entries: Vec<_> = entries_vec
-            .into_iter()
-            .filter(|entry| {
-                let path = entry.path();
-                let path_str = path.to_string_lossy();
-                
-                // Skip symlinks entirely
-                if let Ok(metadata) = fs::metadata(&path) {
-                    if metadata.file_type().is_symlink() {
-                        return false;
-                    }
-                }
-                
-                // Skip system directories that cause issues
-                #[cfg(unix)]
-                {
-                    if path_str.contains("/System/Volumes/Data") ||
-                       path_str.contains("/private/var/vm") ||
-                       path_str.contains("/dev") ||
-                       path_str.contains("/proc") ||
-                       path_str.contains("/sys") {
-                        return false;
-                    }
-                }
-                
-                #[cfg(windows)]
-                {
-                    if path_str.contains("\\System Volume Information") ||
-                       path_str.contains("\\$Recycle.Bin") ||
-                       path_str.contains("\\Windows\\System32\\config") {
-                        return false;
-                    }
-                }
-                
-                true
-            })
-            .collect();
+        // No filtering - scan everything
+        let filtered_entries = entries_vec;
         
         let children: Vec<FileNode> = filtered_entries
             .par_iter()
