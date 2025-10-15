@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { open } from '@tauri-apps/plugin-dialog'
-import { FolderOpen, HardDrive, BarChart3, Zap, Shield, Eye, Layers } from 'lucide-react'
+import { FolderOpen, HardDrive, BarChart3, Shield, Eye, Layers } from 'lucide-react'
 import { StatsDisplay } from '@/components/StatsDisplay'
 
 // Feature card component
@@ -16,9 +16,7 @@ interface FeatureCardProps {
 function FeatureCard({ icon, title, description }: FeatureCardProps) {
   return (
     <div className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg group relative overflow-hidden">
-      {/* Background decoration */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
       <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300 flex-shrink-0 shadow-sm">
         <div className="w-4 h-4 flex items-center justify-center text-primary transition-transform duration-300 group-hover:scale-110">
           {icon}
@@ -150,12 +148,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Main Card - Compact & Enhanced */}
+        {/* Main Card */}
         <div className="bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm rounded-lg border border-border/50 shadow-lg p-3 space-y-3 hover:shadow-xl transition-all duration-300 max-w-xs mx-auto relative overflow-hidden">
-          {/* Decorative Elements */}
           <div className="absolute top-0 right-0 w-12 h-12 bg-primary/5 rounded-full blur-lg"></div>
           <div className="absolute bottom-0 left-0 w-10 h-10 bg-primary/5 rounded-full blur-md"></div>
-          
           <div className="relative z-10 space-y-3">
             <div className="text-center space-y-1">
               <h2 className="text-sm font-bold text-foreground">開始分析</h2>
