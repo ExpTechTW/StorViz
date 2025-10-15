@@ -389,9 +389,6 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
 
     // Spawn background scanning task
     std::thread::spawn(move || {
-        println!("[RUST DEBUG] ========== SCAN THREAD STARTED ==========");
-        println!("[RUST DEBUG] Scanning path: {}", path);
-
         let state = ScanState::new();
 
         // Register the current scan state for cancellation
@@ -404,47 +401,45 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
 
         // Get disk info for root directory scans
         let is_root = is_root_directory(&path);
-        println!("[RUST DEBUG] Is root directory: {}", is_root);
 
         let disk_info = if is_root {
-            let info = get_disk_info(root_path);
-            if let Some(ref di) = info {
-                println!("[RUST DEBUG] Disk info - Total: {} bytes, Available: {} bytes, Used: {} bytes",
-                    di.total_space, di.available_space, di.used_space);
-            }
-            info
+            get_disk_info(root_path)
         } else {
-            println!("[RUST DEBUG] Not a root directory, skipping disk info");
             None
         };
 
-        println!("[RUST DEBUG] Starting recursive scan...");
+        // Send initial message with disk_info for progress calculation
+        if disk_info.is_some() {
+            let initial_payload = PartialScanResult {
+                nodes: Vec::new(),
+                compact_nodes: Vec::new(),
+                total_scanned: 0,
+                total_size: 0,
+                is_complete: false,
+                root_node: None,
+                compact_root: None,
+                disk_info: disk_info.clone(),
+                current_path: Some(path.clone()),
+            };
+            let _ = on_batch.send(initial_payload);
+        }
+
         match scan_directory_recursive(root_path, &on_batch, &state, root_path) {
             Ok(root_node) => {
-                println!("[RUST DEBUG] ✓ Recursive scan completed");
-                println!("[RUST DEBUG] Root node size before limiting: {} bytes", root_node.size);
-                println!("[RUST DEBUG] Root node children before limiting: {}", root_node.children.as_ref().map_or(0, |c| c.len()));
-
                 let limited_root = build_limited_depth_node(&root_node, MAX_DEPTH);
-                println!("[RUST DEBUG] Root node size after limiting: {} bytes", limited_root.size);
-                println!("[RUST DEBUG] Root node children after limiting: {}", limited_root.children.as_ref().map_or(0, |c| c.len()));
-
                 send_final_batch(&on_batch, &state, limited_root, disk_info);
             }
             Err(e) => {
-                println!("[RUST DEBUG] ❌ Scan failed: {}", e);
+                eprintln!("Scan failed: {}", e);
             }
         }
 
-        println!("[RUST DEBUG] Clearing global scan state...");
         // Clear the current scan state when done
         if let Some(global_state) = CURRENT_SCAN_STATE.get() {
             if let Ok(mut current) = global_state.lock() {
                 *current = None;
             }
         }
-
-        println!("[RUST DEBUG] ========== SCAN THREAD COMPLETED ==========");
     });
 
     Ok(())
@@ -479,15 +474,6 @@ fn send_final_batch(channel: &Channel<PartialScanResult>, state: &ScanState, roo
     let (total_items, total_size) = state.get_stats();
     let mut remaining_compact_nodes = state.clear_compact_buffer();
 
-    println!("[RUST DEBUG] ========== PREPARING FINAL BATCH ==========");
-    println!("[RUST DEBUG] Total items scanned: {}", total_items);
-    println!("[RUST DEBUG] Total size scanned: {} bytes", total_size);
-    println!("[RUST DEBUG] Remaining compact nodes in buffer: {}", remaining_compact_nodes.len());
-    println!("[RUST DEBUG] Root node name: {}", root_node.name);
-    println!("[RUST DEBUG] Root node size: {} bytes", root_node.size);
-    println!("[RUST DEBUG] Root node path: {}", root_node.path);
-    println!("[RUST DEBUG] Disk info present: {}", disk_info.is_some());
-
     // Add root-level files as compact nodes (directories were already added during scan)
     if let Some(ref children) = root_node.children {
         let root_files: Vec<CompactFileNode> = children
@@ -497,14 +483,12 @@ fn send_final_batch(channel: &Channel<PartialScanResult>, state: &ScanState, roo
             .collect();
 
         if !root_files.is_empty() {
-            println!("[RUST DEBUG] Adding {} root-level files to compact nodes", root_files.len());
             remaining_compact_nodes.extend(root_files);
         }
     }
 
     // Send remaining compact nodes if any
     if !remaining_compact_nodes.is_empty() {
-        println!("[RUST DEBUG] Sending remaining {} compact nodes...", remaining_compact_nodes.len());
         let batch_payload = PartialScanResult {
             nodes: Vec::new(),
             compact_nodes: remaining_compact_nodes,
@@ -516,10 +500,7 @@ fn send_final_batch(channel: &Channel<PartialScanResult>, state: &ScanState, roo
             disk_info: None,
             current_path: None,
         };
-        match channel.send(batch_payload) {
-            Ok(_) => println!("[RUST DEBUG] ✓ Remaining compact nodes sent"),
-            Err(e) => println!("[RUST DEBUG] ❌ Error sending remaining nodes: {:?}", e),
-        }
+        let _ = channel.send(batch_payload);
     }
 
     // Send final completion message with root metadata only
@@ -543,20 +524,13 @@ fn send_final_batch(channel: &Channel<PartialScanResult>, state: &ScanState, roo
         current_path: None,
     };
 
-    println!("[RUST DEBUG] Sending final completion message");
-    match channel.send(payload) {
-        Ok(_) => println!("[RUST DEBUG] ✓ Final completion message sent successfully"),
-        Err(e) => println!("[RUST DEBUG] ❌ Error sending final completion: {:?}", e),
-    }
-    println!("[RUST DEBUG] ========== FINAL BATCH SENT ==========");
+    let _ = channel.send(payload);
 }
 
 fn send_compact_batch(channel: &Channel<PartialScanResult>, state: &ScanState) {
     let (total_items, total_size) = state.get_stats();
     let compact_nodes = state.clear_compact_buffer();
     let current_path = state.get_current_path();
-
-    println!("[RUST DEBUG] Sending batch with {} compact nodes", compact_nodes.len());
 
     let payload = PartialScanResult {
         nodes: Vec::new(),
@@ -780,15 +754,22 @@ fn scan_directory_recursive(
         if let Ok(canonical_path) = fs::canonicalize(path) {
             state.push_to_recursion_stack(&canonical_path);
         }
-        
+
         let entries_vec: Vec<_> = entries.flatten().collect();
-        
+
         // No filtering - scan everything
         let filtered_entries = entries_vec;
-        
+
+        // For root directory's direct children, send immediate progress updates
+        let is_root_level = path == root_path;
+
         let children: Vec<FileNode> = filtered_entries
             .par_iter()
             .filter_map(|entry| {
+                // Send progress update before scanning each root-level directory
+                if is_root_level {
+                    send_path_update(channel, state);
+                }
                 scan_directory_recursive(&entry.path(), channel, state, root_path).ok()
             })
             .collect();

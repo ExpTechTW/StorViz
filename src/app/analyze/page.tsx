@@ -476,15 +476,9 @@ function AnalyzeContent() {
 
     const scanFolder = async () => {
       try {
-        console.log('[DEBUG] ========== STARTING SCAN ==========')
-        console.log('[DEBUG] Scan path:', path)
-        console.log('[DEBUG] scanningRef.current:', scanningRef.current)
-
         scanningRef.current = true
         setIsLoading(true)
         setScanProgress({ currentPath: path, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
-
-        console.log('[DEBUG] Initial states set, creating channel...')
 
         // Create channel for streaming batches
         const onBatch = new Channel<{
@@ -499,63 +493,29 @@ function AnalyzeContent() {
           current_path?: string
         }>()
         onBatch.onmessage = (message) => {
-          console.log('[DEBUG] Received batch message:', {
-            is_complete: message.is_complete,
-            total_scanned: message.total_scanned,
-            total_size: message.total_size,
-            total_size_formatted: formatBytes(message.total_size),
-            compact_nodes_count: message.compact_nodes?.length || 0,
-            has_root_node: !!message.root_node,
-            has_disk_info: !!message.disk_info,
-            current_path: message.current_path
-          })
-
           // Cache compact nodes from batches
           if (message.compact_nodes && message.compact_nodes.length > 0) {
-            console.log('[DEBUG] Caching', message.compact_nodes.length, 'compact nodes')
             compactNodesCache.current.push(...message.compact_nodes)
-            console.log('[DEBUG] Total cached compact nodes:', compactNodesCache.current.length)
           }
 
-          // Update progress
-          setScanProgress({
+          // Update progress with disk_info if available
+          setScanProgress(prev => ({
             currentPath: message.current_path || path,
             filesScanned: message.total_scanned,
             scannedSize: message.total_size,
-            estimatedTotal: 0 // Will be updated when disk_info is available
-          })
-
-          console.log('[DEBUG] Progress state updated')
+            estimatedTotal: message.disk_info ? message.disk_info.used_space : (prev?.estimatedTotal || 0)
+          }))
 
           // If complete, rebuild tree from cached compact nodes
           if (message.is_complete) {
-            console.log('[DEBUG] ========== SCAN COMPLETE ==========')
-            console.log('[DEBUG] Total cached compact nodes:', compactNodesCache.current.length)
-
-            if (message.disk_info) {
-              console.log('[DEBUG] Disk info:', {
-                totalSpace: formatBytes(message.disk_info.total_space),
-                availableSpace: formatBytes(message.disk_info.available_space),
-                usedSpace: formatBytes(message.disk_info.used_space)
-              })
-            }
-
             if (!message.root_node) {
-              console.error('[DEBUG] ❌ ERROR: is_complete=true but no root_node!')
+              console.error('ERROR: is_complete=true but no root_node!')
               return
             }
-
-            console.log('[DEBUG] Building tree from cached compact nodes...')
-            const startTime = performance.now()
 
             // Rebuild tree from cached compact nodes
             const finalTree = rebuildTreeFromCompactNodes(message.root_node, compactNodesCache.current)
 
-            const buildTime = (performance.now() - startTime).toFixed(2)
-            console.log('[DEBUG] Tree rebuilt in', buildTime, 'ms')
-            console.log('[DEBUG] Final tree children:', finalTree.children?.length || 0)
-
-            console.log('[DEBUG] Setting final data states...')
             setData(finalTree)
             setCurrentLevel(finalTree)
             setBreadcrumb([finalTree])
@@ -565,40 +525,25 @@ function AnalyzeContent() {
               usedSpace: message.disk_info.used_space
             } : null)
 
-            console.log('[DEBUG] Setting isLoading = false')
             setIsLoading(false)
-            console.log('[DEBUG] Clearing scan progress')
             setScanProgress(null)
 
-            console.log('[DEBUG] Updating stats...')
             // 更新累計統計數據
             updateStats(message.total_scanned, message.total_size)
 
             // Clear cache
-            console.log('[DEBUG] Clearing compact nodes cache')
             compactNodesCache.current = []
-
-            console.log('[DEBUG] ========== SCAN COMPLETED SUCCESSFULLY ==========')
-          } else {
-            console.log('[DEBUG] Still scanning... (is_complete=false)')
           }
         }
 
         // Start streaming scan (returns immediately, scanning in background)
-        console.log('[DEBUG] Invoking scan_directory_streaming...')
-        const invokeResult = await invoke('scan_directory_streaming', { path, onBatch })
-        console.log('[DEBUG] scan_directory_streaming invoke returned:', invokeResult)
+        await invoke('scan_directory_streaming', { path, onBatch })
       } catch (error) {
-        console.error('[DEBUG] ❌ SCAN FAILED')
-        console.error('[DEBUG] Error:', error)
-        console.error('[DEBUG] Error type:', typeof error)
-        console.error('[DEBUG] Error details:', JSON.stringify(error, null, 2))
+        console.error('Scan failed:', error)
         setIsLoading(false)
         setScanProgress(null)
       } finally {
-        console.log('[DEBUG] Scan finally block - setting scanningRef.current = false')
         scanningRef.current = false
-        console.log('🏁 Scan finished (cleanup)')
       }
     }
 
