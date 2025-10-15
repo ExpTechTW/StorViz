@@ -355,6 +355,8 @@ function AnalyzeContent() {
   const [scanStartTime, setScanStartTime] = useState<number | null>(null)
   const [scanElapsedTime, setScanElapsedTime] = useState<number>(0)
   const [scanCompleteTime, setScanCompleteTime] = useState<number | null>(null)
+  const [showSummary, setShowSummary] = useState(false)
+  const [scanSummary, setScanSummary] = useState<{ filesScanned: number; totalSize: number; duration: number } | null>(null)
 
   // Use ref to track component state
   const scanningRef = useRef(false)
@@ -556,11 +558,14 @@ function AnalyzeContent() {
             // Clear cache
             compactNodesCache.current = []
 
-            // Wait 3 seconds before hiding loading screen
-            setTimeout(() => {
-              setIsLoading(false)
-              setScanProgress(null)
-            }, 3000)
+            // Show summary screen
+            setScanSummary({
+              filesScanned: message.total_scanned,
+              totalSize: message.total_size,
+              duration: completionTime
+            })
+            setShowSummary(true)
+            setScanProgress(null)
           }
         }
 
@@ -951,6 +956,106 @@ function AnalyzeContent() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-muted-foreground">未選擇資料夾</p>
+      </div>
+    )
+  }
+
+  // Show summary screen after scan completes
+  if (showSummary && scanSummary) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 flex items-center justify-center relative overflow-hidden p-4">
+        {/* Background Tech Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-primary/5 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-24 h-24 bg-primary/5 rounded-full blur-2xl animate-pulse delay-1000"></div>
+        </div>
+
+        <div className="w-full max-w-2xl space-y-6 relative z-20">
+          {/* Success Icon */}
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-500/20 backdrop-blur-md border-2 border-emerald-500/50 mb-4 animate-in zoom-in duration-500">
+              <svg className="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-foreground">掃描完成！</h2>
+            <p className="text-muted-foreground">已完成資料夾分析，以下是掃描結果</p>
+          </div>
+
+          {/* Summary Card */}
+          <div className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-6 space-y-6 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:shadow-lg group relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-3 gap-4 relative z-10">
+              <div className="text-center space-y-2 p-4 rounded-lg bg-muted/30">
+                <p className="text-xs text-muted-foreground">掃描項目</p>
+                <p className="text-3xl font-bold text-foreground font-mono">
+                  {scanSummary.filesScanned.toLocaleString()}
+                </p>
+              </div>
+              <div className="text-center space-y-2 p-4 rounded-lg bg-muted/30">
+                <p className="text-xs text-muted-foreground">總大小</p>
+                <p className="text-3xl font-bold text-foreground font-mono">
+                  {formatBytes(scanSummary.totalSize)}
+                </p>
+              </div>
+              <div className="text-center space-y-2 p-4 rounded-lg bg-muted/30">
+                <p className="text-xs text-muted-foreground">耗時</p>
+                <p className="text-3xl font-bold text-primary font-mono">
+                  {formatTime(scanSummary.duration)}
+                </p>
+              </div>
+            </div>
+
+            {/* Disk Info */}
+            {diskInfo && (
+              <div className="pt-4 border-t border-border/50 relative z-10">
+                <p className="text-sm text-muted-foreground mb-3">硬碟資訊</p>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">總容量</span>
+                    <span className="text-sm font-mono text-foreground">{formatBytes(diskInfo.totalSpace)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">已使用</span>
+                    <span className="text-sm font-mono text-foreground">{formatBytes(diskInfo.usedSpace)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">可用空間</span>
+                    <span className="text-sm font-mono text-foreground">{formatBytes(diskInfo.availableSpace)}</span>
+                  </div>
+                  <div className="mt-2">
+                    <div className="w-full bg-muted/50 rounded-full h-2">
+                      <div
+                        className="bg-primary h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${(diskInfo.usedSpace / diskInfo.totalSpace) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Button */}
+            <div className="pt-4 border-t border-border/50 relative z-10 flex justify-center">
+              <button
+                onClick={() => {
+                  setShowSummary(false)
+                  setIsLoading(false)
+                }}
+                className="bg-gradient-to-br from-primary/20 to-primary/10 backdrop-blur-md rounded-lg border-2 border-primary/50 px-6 py-3 flex items-center gap-3 hover:from-primary/30 hover:to-primary/15 hover:border-primary/70 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 group relative overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <span className="text-base font-semibold text-primary relative z-10">查看分析結果</span>
+                <svg className="w-5 h-5 text-primary relative z-10 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
