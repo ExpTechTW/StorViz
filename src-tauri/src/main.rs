@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 use tauri::ipc::Channel;
@@ -51,6 +51,7 @@ struct ScanState {
     scanned_size: Arc<Mutex<u64>>,
     batch_buffer: Arc<Mutex<Vec<FileNode>>>,
     visited_inodes: Arc<Mutex<HashSet<u64>>>,
+    recursion_stack: Arc<Mutex<HashSet<PathBuf>>>,
 }
 
 impl ScanState {
@@ -60,6 +61,7 @@ impl ScanState {
             scanned_size: Arc::new(Mutex::new(0)),
             batch_buffer: Arc::new(Mutex::new(Vec::new())),
             visited_inodes: Arc::new(Mutex::new(HashSet::new())),
+            recursion_stack: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -109,6 +111,28 @@ impl ScanState {
     fn mark_visited_inode(&self, inode: u64) -> bool {
         if let Ok(mut visited) = self.visited_inodes.lock() {
             visited.insert(inode)
+        } else {
+            false
+        }
+    }
+
+    fn push_to_recursion_stack(&self, path: &Path) -> bool {
+        if let Ok(mut stack) = self.recursion_stack.lock() {
+            stack.insert(path.to_path_buf())
+        } else {
+            false
+        }
+    }
+
+    fn pop_from_recursion_stack(&self, path: &Path) {
+        if let Ok(mut stack) = self.recursion_stack.lock() {
+            stack.remove(path);
+        }
+    }
+
+    fn is_in_recursion_stack(&self, path: &Path) -> bool {
+        if let Ok(stack) = self.recursion_stack.lock() {
+            stack.contains(path)
         } else {
             false
         }
@@ -231,7 +255,7 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
             None
         };
         
-        if let Ok(root_node) = scan_directory_recursive(root_path, &on_batch, &state) {
+        if let Ok(root_node) = scan_directory_recursive(root_path, &on_batch, &state, root_path) {
             let limited_root = build_limited_depth_node(&root_node, MAX_DEPTH);
             send_final_batch(&on_batch, &state, limited_root, disk_info);
         }
@@ -307,8 +331,41 @@ fn scan_directory_recursive(
     path: &Path,
     channel: &Channel<PartialScanResult>,
     state: &ScanState,
+    root_path: &Path,
 ) -> Result<FileNode, String> {
     let path_str = path.to_string_lossy().to_string();
+    
+    // Prevent scanning above the root path to avoid duplicate counting
+    // Use canonicalized paths for accurate comparison
+    if let Ok(canonical_root) = fs::canonicalize(root_path) {
+        if let Ok(canonical_path) = fs::canonicalize(path) {
+            if !canonical_path.starts_with(&canonical_root) {
+                println!("DEBUG: Skipping path above root: {} (canonical: {}) (root canonical: {})", 
+                         path_str, canonical_path.display(), canonical_root.display());
+                return Ok(FileNode {
+                    name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
+                    size: 0,
+                    path: path_str,
+                    children: None,
+                    is_directory: false,
+                });
+            }
+        }
+    }
+    
+    // Check for circular path using canonicalized path
+    if let Ok(canonical_path) = fs::canonicalize(path) {
+        if state.is_in_recursion_stack(&canonical_path) {
+            println!("DEBUG: Detected circular path: {} (canonical: {})", path_str, canonical_path.display());
+            return Ok(FileNode {
+                name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
+                size: 0,
+                path: path_str,
+                children: None,
+                is_directory: false,
+            });
+        }
+    }
     
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
     
@@ -356,9 +413,39 @@ fn scan_directory_recursive(
                         is_directory: false,
                     });
                 } else if target_metadata.is_dir() {
-                    // For directory symlinks, we'll scan the target directory
+                    // For directory symlinks, check if target is above root path or in recursion stack
+                    if let Ok(canonical_root) = fs::canonicalize(root_path) {
+                        if let Ok(canonical_target) = fs::canonicalize(&target_path) {
+                            if !canonical_target.starts_with(&canonical_root) {
+                                println!("DEBUG: Symlink '{}' points to directory above root: {} (canonical: {}) (root canonical: {})", 
+                                         path_str, target_path.display(), canonical_target.display(), canonical_root.display());
+                                return Ok(FileNode {
+                                    name,
+                                    size: 0,
+                                    path: path_str,
+                                    children: None,
+                                    is_directory: false,
+                                });
+                            }
+                        }
+                    }
+                    
+                    if let Ok(canonical_target) = fs::canonicalize(&target_path) {
+                        if state.is_in_recursion_stack(&canonical_target) {
+                            println!("DEBUG: Symlink '{}' points to directory already in recursion stack: {}", path_str, canonical_target.display());
+                            return Ok(FileNode {
+                                name,
+                                size: 0,
+                                path: path_str,
+                                children: None,
+                                is_directory: false,
+                            });
+                        }
+                    }
+                    
+                    // Safe to scan the target directory
                     println!("DEBUG: Symlink '{}' points to directory, scanning target", path_str);
-                    return scan_directory_recursive(&target_path, channel, state);
+                    return scan_directory_recursive(&target_path, channel, state, root_path);
                 }
             }
         }
@@ -406,6 +493,11 @@ fn scan_directory_recursive(
 
     // Scan directory with parallel processing
     if let Ok(entries) = fs::read_dir(path) {
+        // Add current directory to recursion stack
+        if let Ok(canonical_path) = fs::canonicalize(path) {
+            state.push_to_recursion_stack(&canonical_path);
+        }
+        
         let entries_vec: Vec<_> = entries.flatten().collect();
         
         // No filtering - scan everything
@@ -414,9 +506,14 @@ fn scan_directory_recursive(
         let children: Vec<FileNode> = filtered_entries
             .par_iter()
             .filter_map(|entry| {
-                scan_directory_recursive(&entry.path(), channel, state).ok()
+                scan_directory_recursive(&entry.path(), channel, state, root_path).ok()
             })
             .collect();
+        
+        // Remove current directory from recursion stack
+        if let Ok(canonical_path) = fs::canonicalize(path) {
+            state.pop_from_recursion_stack(&canonical_path);
+        }
 
         let dir_total_size: u64 = children.iter().map(|c| c.size).sum();
         
