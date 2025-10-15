@@ -104,10 +104,51 @@ function AnalyzeContent() {
 
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoveredSectorId, setHoveredSectorId] = useState<string | null>(null)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string; label: string; size: string } | null>(null)
 
-  // Hover handlers
-  const handleHover = (sectorId: string) => setHoveredSectorId(sectorId)
-  const handleLeave = () => setHoveredSectorId(null)
+  // Hover handlers with smart positioning
+  const tooltipRef = useRef<HTMLDivElement>(null)
+
+  const calculateTooltipPosition = (mouseX: number, mouseY: number) => {
+    const offsetX = 8
+    const offsetY = 8
+
+    // Use actual tooltip dimensions if available, otherwise use estimates
+    const tooltipWidth = tooltipRef.current?.offsetWidth || 200
+    const tooltipHeight = tooltipRef.current?.offsetHeight || 70
+
+    // Check if mouse is on left or right half of screen
+    const isLeftHalf = mouseX < window.innerWidth / 2
+    // Check if mouse is on top or bottom half of screen
+    const isTopHalf = mouseY < window.innerHeight / 2
+
+    let x = isLeftHalf ? mouseX + offsetX : mouseX - tooltipWidth - offsetX
+    let y = isTopHalf ? mouseY + offsetY : mouseY - tooltipHeight - offsetY
+
+    return { x, y }
+  }
+
+  const handleHover = (sectorId: string, event: React.MouseEvent, label: string, name: string, size: string) => {
+    setHoveredSectorId(sectorId)
+    const pos = calculateTooltipPosition(event.clientX, event.clientY)
+    setTooltip({
+      x: pos.x,
+      y: pos.y,
+      content: name,
+      label: label,
+      size: size
+    })
+  }
+  const handleMouseMove = (event: React.MouseEvent) => {
+    if (tooltip) {
+      const pos = calculateTooltipPosition(event.clientX, event.clientY)
+      setTooltip(prev => prev ? { ...prev, x: pos.x, y: pos.y } : null)
+    }
+  }
+  const handleLeave = () => {
+    setHoveredSectorId(null)
+    setTooltip(null)
+  }
 
   // Sync hover states between chart and file list
   useEffect(() => {
@@ -696,7 +737,8 @@ function AnalyzeContent() {
                                     stroke={item.color}
                                     className="chart-sector"
                                     data-sector-id={sectorId}
-                                    onMouseEnter={() => handleHover(sectorId)}
+                                    onMouseEnter={(e) => handleHover(sectorId, e, getFileTypeInfo(item.name, item.node.isDirectory).label, item.name, formatBytes(item.value))}
+                                    onMouseMove={handleMouseMove}
                                     style={{
                                       cursor: 'pointer',
                                       animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
@@ -707,12 +749,6 @@ function AnalyzeContent() {
                                       }
                                     }}
                                   >
-                                    <title>
-                                      {item.name === '可用空間' 
-                                        ? `💾 可用空間\n${formatBytes(item.value)}\n${diskInfo ? `總容量: ${formatBytes(diskInfo.totalSpace)}` : ''}`
-                                        : `${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${getFileTypeInfo(item.name, item.node.isDirectory).label}\n${item.name}\nSize: ${formatBytes(item.value)}`
-                                      }
-                                    </title>
                                   </circle>
                                 </g>
                               )
@@ -752,7 +788,8 @@ function AnalyzeContent() {
                                 strokeWidth={0.5}
                                 className="chart-sector"
                                 data-sector-id={sectorId}
-                                onMouseEnter={() => handleHover(sectorId)}
+                                onMouseEnter={(e) => handleHover(sectorId, e, getFileTypeInfo(item.name, item.node.isDirectory).label, item.name, formatBytes(item.value))}
+                                onMouseMove={handleMouseMove}
                                 style={{
                                   cursor: 'pointer',
                                   animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
@@ -763,12 +800,6 @@ function AnalyzeContent() {
                                   }
                                 }}
                               >
-                                <title>
-                                  {item.name === '可用空間' 
-                                    ? `💾 可用空間\n${formatBytes(item.value)}\n${diskInfo ? `總容量: ${formatBytes(diskInfo.totalSpace)}` : ''}`
-                                    : `${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${getFileTypeInfo(item.name, item.node.isDirectory).label}\n${item.name}\nSize: ${formatBytes(item.value)}`
-                                  }
-                                </title>
                               </path>
                             )
                           })}
@@ -803,12 +834,9 @@ function AnalyzeContent() {
                 key={item.path}
                 className="flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent file-item"
                 data-sector-id={sectorId}
-                onMouseEnter={() => handleHover(sectorId)}
+                onMouseEnter={(e) => handleHover(sectorId, e, fileTypeInfo.label, item.name, formatBytes(item.value))}
+                onMouseMove={handleMouseMove}
                 onClick={() => handlePieClick(item)}
-                title={item.name === '可用空間'
-                  ? `💾 可用空間 - ${formatBytes(item.value)}${diskInfo ? `\n總容量: ${formatBytes(diskInfo.totalSpace)}` : ''}`
-                  : `${fileTypeInfo.label} - ${item.name} - ${formatBytes(item.value)}`
-                }
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <IconComponent
@@ -832,6 +860,31 @@ function AnalyzeContent() {
           </div>
         </div>
       </div>
+
+      {/* Custom Tooltip */}
+      {tooltip && (
+        <div
+          ref={tooltipRef}
+          className="fixed pointer-events-none"
+          style={{
+            left: `${tooltip.x}px`,
+            top: `${tooltip.y}px`,
+            zIndex: 999999,
+          }}
+        >
+          <div className="bg-card border-2 border-primary/20 rounded-lg shadow-xl px-3 py-2 space-y-1">
+            <div className="text-xs font-semibold text-primary">
+              {tooltip.label}
+            </div>
+            <div className="text-sm font-medium text-foreground max-w-[200px] truncate">
+              {tooltip.content}
+            </div>
+            <div className="text-xs font-mono text-muted-foreground">
+              {tooltip.size}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
