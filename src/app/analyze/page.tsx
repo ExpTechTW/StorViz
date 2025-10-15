@@ -104,7 +104,7 @@ function AnalyzeContent() {
 
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoveredSectorId, setHoveredSectorId] = useState<string | null>(null)
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string; label: string; size: string } | null>(null)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string; label: string; size: string; icon: any; color: string } | null>(null)
 
   // Hover handlers with smart positioning
   const tooltipRef = useRef<HTMLDivElement>(null)
@@ -128,7 +128,7 @@ function AnalyzeContent() {
     return { x, y }
   }
 
-  const handleHover = (sectorId: string, event: React.MouseEvent, label: string, name: string, size: string) => {
+  const handleHover = (sectorId: string, event: React.MouseEvent, label: string, name: string, size: string, icon: any, color: string) => {
     setHoveredSectorId(sectorId)
     const pos = calculateTooltipPosition(event.clientX, event.clientY)
     setTooltip({
@@ -136,7 +136,9 @@ function AnalyzeContent() {
       y: pos.y,
       content: name,
       label: label,
-      size: size
+      size: size,
+      icon: icon,
+      color: color
     })
   }
   const handleMouseMove = (event: React.MouseEvent) => {
@@ -737,7 +739,10 @@ function AnalyzeContent() {
                                     stroke={item.color}
                                     className="chart-sector"
                                     data-sector-id={sectorId}
-                                    onMouseEnter={(e) => handleHover(sectorId, e, getFileTypeInfo(item.name, item.node.isDirectory).label, item.name, formatBytes(item.value))}
+                                    onMouseEnter={(e) => {
+                                      const fileTypeInfo = getFileTypeInfo(item.name, item.node.isDirectory)
+                                      handleHover(sectorId, e, fileTypeInfo.label, item.name, formatBytes(item.value), fileTypeInfo.icon, fileTypeInfo.color)
+                                    }}
                                     onMouseMove={handleMouseMove}
                                     style={{
                                       cursor: 'pointer',
@@ -788,7 +793,10 @@ function AnalyzeContent() {
                                 strokeWidth={0.5}
                                 className="chart-sector"
                                 data-sector-id={sectorId}
-                                onMouseEnter={(e) => handleHover(sectorId, e, getFileTypeInfo(item.name, item.node.isDirectory).label, item.name, formatBytes(item.value))}
+                                onMouseEnter={(e) => {
+                                  const fileTypeInfo = getFileTypeInfo(item.name, item.node.isDirectory)
+                                  handleHover(sectorId, e, fileTypeInfo.label, item.name, formatBytes(item.value), fileTypeInfo.icon, fileTypeInfo.color)
+                                }}
                                 onMouseMove={handleMouseMove}
                                 style={{
                                   cursor: 'pointer',
@@ -834,7 +842,7 @@ function AnalyzeContent() {
                 key={item.path}
                 className="flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent file-item"
                 data-sector-id={sectorId}
-                onMouseEnter={(e) => handleHover(sectorId, e, fileTypeInfo.label, item.name, formatBytes(item.value))}
+                onMouseEnter={(e) => handleHover(sectorId, e, fileTypeInfo.label, item.name, formatBytes(item.value), fileTypeInfo.icon, fileTypeInfo.color)}
                 onMouseMove={handleMouseMove}
                 onClick={() => handlePieClick(item)}
               >
@@ -873,8 +881,16 @@ function AnalyzeContent() {
           }}
         >
           <div className="bg-card border-2 border-primary/20 rounded-lg shadow-xl px-3 py-2 space-y-1">
-            <div className="text-xs font-semibold text-primary">
-              {tooltip.label}
+            <div className="flex items-center gap-2">
+              {tooltip.icon && (
+                <tooltip.icon
+                  className="w-4 h-4 flex-shrink-0"
+                  style={{ color: tooltip.color }}
+                />
+              )}
+              <div className="text-xs font-semibold" style={{ color: tooltip.color }}>
+                {tooltip.label}
+              </div>
             </div>
             <div className="text-sm font-medium text-foreground max-w-[200px] truncate">
               {tooltip.content}
