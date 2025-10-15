@@ -9,7 +9,12 @@
       "Bash(taskkill:*)",
       "Bash(git restore:*)",
       "Bash(bun run:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(diskutil:*)",
+      "Bash(sudo du:*)",
+      "Read(//Library/**)",
+      "Bash(tmutil listlocalsnapshots:*)",
+      "Bash(/tmp/test_disk_size:*)"
     ],
     "deny": [],
     "ask": []

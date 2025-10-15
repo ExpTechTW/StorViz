@@ -63,7 +63,7 @@ const COLOR_SCHEMES = [
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
-  const k = 1024
+  const k = 1000
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
@@ -71,7 +71,7 @@ function formatBytes(bytes: number): string {
 
 function formatBytesCompact(bytes: number): string {
   if (bytes === 0) return '0 B'
-  const k = 1024
+  const k = 1000
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   const value = bytes / Math.pow(k, i)
@@ -86,6 +86,17 @@ function formatBytesCompact(bytes: number): string {
   } else {
     return `${value.toFixed(2)} ${sizes[i]}`
   }
+}
+
+// Scale all node sizes by a factor to match df's used_space
+// This accounts for APFS copy-on-write, compression, and deduplication
+function scaleNodeSizes(node: FileNode, scaleFactor: number): FileNode {
+  const scaledNode: FileNode = {
+    ...node,
+    size: Math.round(node.size * scaleFactor),
+    children: node.children?.map(child => scaleNodeSizes(child, scaleFactor))
+  }
+  return scaledNode
 }
 
 function AnalyzeContent() {
@@ -229,24 +240,22 @@ function AnalyzeContent() {
         // Create channel for streaming batches
         const onBatch = new Channel<{ nodes: FileNode[]; total_scanned: number; total_size: number; is_complete: boolean; root_node?: FileNode; disk_info?: { total_space: number; available_space: number; used_space: number }; current_path?: string }>()
         onBatch.onmessage = (message) => {
-          // Use disk_info.used_space as estimated total
-          // macOS: Now correctly sums all APFS partitions
-          // Windows/Linux: Direct disk usage
+          // Use disk_info.used_space as estimated total for progress calculation
           const estimatedTotal = message.disk_info ? message.disk_info.used_space : 0
 
           // Log progress update
           const progress = estimatedTotal > 0 ? (message.total_size / estimatedTotal * 100).toFixed(2) : 0
           console.log('📊 Scan Progress:', {
             filesScanned: message.total_scanned.toLocaleString(),
-            scannedSize: `${(message.total_size / 1024 / 1024 / 1024).toFixed(2)} GB`,
-            estimatedTotal: estimatedTotal > 0 ? `${(estimatedTotal / 1024 / 1024 / 1024).toFixed(2)} GB` : 'N/A',
+            scannedSize: `${(message.total_size / 1_000_000_000).toFixed(2)} GB`,
+            estimatedTotal: estimatedTotal > 0 ? `${(estimatedTotal / 1_000_000_000).toFixed(2)} GB` : 'N/A',
             progress: estimatedTotal > 0 ? `${progress}%` : 'N/A',
             currentPath: message.current_path,
             isComplete: message.is_complete,
             diskInfo: message.disk_info ? {
-              totalSpace: `${(message.disk_info.total_space / 1024 / 1024 / 1024).toFixed(2)} GB`,
-              usedSpace: `${(message.disk_info.used_space / 1024 / 1024 / 1024).toFixed(2)} GB`,
-              availableSpace: `${(message.disk_info.available_space / 1024 / 1024 / 1024).toFixed(2)} GB`,
+              totalSpace: `${(message.disk_info.total_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.total_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`,
+              usedSpace: `${(message.disk_info.used_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.used_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`,
+              availableSpace: `${(message.disk_info.available_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.available_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`,
             } : null
           })
 
@@ -259,19 +268,35 @@ function AnalyzeContent() {
 
           // If complete, use root_node from the message
           if (message.is_complete && message.root_node) {
+            // Calculate the scaling factor to match df's used_space
+            // This accounts for APFS copy-on-write, compression, and deduplication
+            let scaledRootNode = message.root_node
+            if (message.disk_info && message.total_size > 0) {
+              const scaleFactor = message.disk_info.used_space / message.total_size
+              console.log('📊 Scaling factor to match df:', {
+                scannedTotal: `${(message.total_size / 1_000_000_000).toFixed(2)} GB`,
+                dfUsedSpace: `${(message.disk_info.used_space / 1_000_000_000).toFixed(2)} GB`,
+                scaleFactor: scaleFactor.toFixed(4)
+              })
+
+              // Scale the entire tree to match df's used_space
+              scaledRootNode = scaleNodeSizes(message.root_node, scaleFactor)
+            }
+
             console.log('✅ Scan Complete!', {
               totalFiles: message.total_scanned.toLocaleString(),
-              totalSize: `${(message.total_size / 1024 / 1024 / 1024).toFixed(2)} GB`,
+              totalSize: `${(message.total_size / 1_000_000_000).toFixed(2)} GB (logical)`,
+              scaledSize: message.disk_info ? `${(message.disk_info.used_space / 1_000_000_000).toFixed(2)} GB (actual)` : 'N/A',
               diskInfo: message.disk_info ? {
-                totalSpace: `${(message.disk_info.total_space / 1024 / 1024 / 1024).toFixed(2)} GB`,
-                usedSpace: `${(message.disk_info.used_space / 1024 / 1024 / 1024).toFixed(2)} GB`,
-                availableSpace: `${(message.disk_info.available_space / 1024 / 1024 / 1024).toFixed(2)} GB`
+                totalSpace: `${(message.disk_info.total_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.total_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`,
+                usedSpace: `${(message.disk_info.used_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.used_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`,
+                availableSpace: `${(message.disk_info.available_space / 1_000_000_000).toFixed(2)} GB (${(message.disk_info.available_space / 1024 / 1024 / 1024).toFixed(2)} GiB)`
               } : 'N/A'
             })
 
-            setData(message.root_node)
-            setCurrentLevel(message.root_node)
-            setBreadcrumb([message.root_node])
+            setData(scaledRootNode)
+            setCurrentLevel(scaledRootNode)
+            setBreadcrumb([scaledRootNode])
             setDiskInfo(message.disk_info ? {
               totalSpace: message.disk_info.total_space,
               availableSpace: message.disk_info.available_space,
@@ -381,9 +406,11 @@ function AnalyzeContent() {
       const isDiskRoot = diskInfo !== null && rootNode === data
       const scannedSize = sortedRootChildren.reduce((sum, node) => sum + node.size, 0)
 
-      // For disk root, total = scanned + available space
+      // For disk root, total = total disk space (from diskInfo)
       // For folders, total = scanned only
-      const totalSize = isDiskRoot ? scannedSize + diskInfo.availableSpace : scannedSize
+      const totalSize = isDiskRoot ? diskInfo.totalSpace : scannedSize
+      // Calculate logical available space: total - scanned
+      const logicalAvailableSpace = isDiskRoot ? diskInfo.totalSpace - scannedSize : 0
       let currentAngle = 0
 
       sortedRootChildren.forEach((node, index) => {
@@ -418,24 +445,24 @@ function AnalyzeContent() {
         currentAngle = nodeEndAngle
       })
 
-      // Add available space for disk root
-      if (isDiskRoot && diskInfo.availableSpace > 0) {
+      // Add logical available space for disk root (total - scanned)
+      if (isDiskRoot && logicalAvailableSpace > 0) {
         if (!layers.has(0)) {
           layers.set(0, [])
         }
 
-        const availableProportion = diskInfo.availableSpace / totalSize
+        const availableProportion = logicalAvailableSpace / totalSize
         const availableAngleRange = 360 * availableProportion
         const availableEndAngle = currentAngle + availableAngleRange
 
         layers.get(0)!.push({
           name: '可用空間',
-          value: diskInfo.availableSpace,
+          value: logicalAvailableSpace,
           color: 'rgba(128, 128, 128, 0.4)', // Semi-transparent gray
           path: '',
           node: {
             name: '可用空間',
-            size: diskInfo.availableSpace,
+            size: logicalAvailableSpace,
             path: '',
             isDirectory: false
           },
