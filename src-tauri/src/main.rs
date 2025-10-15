@@ -50,6 +50,7 @@ struct ScanState {
     counter: Arc<Mutex<u64>>,
     scanned_size: Arc<Mutex<u64>>,
     batch_buffer: Arc<Mutex<Vec<FileNode>>>,
+    #[cfg(unix)]
     visited_inodes: Arc<Mutex<HashSet<u64>>>,
     recursion_stack: Arc<Mutex<HashSet<PathBuf>>>,
 }
@@ -60,6 +61,7 @@ impl ScanState {
             counter: Arc::new(Mutex::new(0)),
             scanned_size: Arc::new(Mutex::new(0)),
             batch_buffer: Arc::new(Mutex::new(Vec::new())),
+            #[cfg(unix)]
             visited_inodes: Arc::new(Mutex::new(HashSet::new())),
             recursion_stack: Arc::new(Mutex::new(HashSet::new())),
         }
