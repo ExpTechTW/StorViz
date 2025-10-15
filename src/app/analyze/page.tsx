@@ -583,7 +583,18 @@ function AnalyzeContent() {
               {/* Current path */}
               <div className="pt-4 border-t border-border relative z-10">
                 <p className="text-xs text-muted-foreground mb-1">當前路徑</p>
-                <p className="text-sm text-foreground font-mono break-all" title={scanProgress.currentPath}>
+                <p
+                  className="text-sm text-foreground font-mono overflow-hidden text-ellipsis"
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    lineHeight: '1.5rem',
+                    height: '3rem',
+                    wordBreak: 'break-all'
+                  }}
+                  title={scanProgress.currentPath}
+                >
                   {scanProgress.currentPath}
                 </p>
               </div>
