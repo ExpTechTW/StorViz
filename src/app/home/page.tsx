@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { open } from '@tauri-apps/plugin-dialog'
+import { join, resourceDir } from '@tauri-apps/api/path'
+import { convertFileSrc, isTauri } from '@tauri-apps/api/core'
 import { FolderOpen, HardDrive, BarChart3, Shield, Eye, Layers, ArrowLeft } from 'lucide-react'
 import { StatsDisplay } from '@/components/StatsDisplay'
 
@@ -105,8 +107,34 @@ export default function HomePage() {
     }
   }, [selectedPath])
 
+  // Audio playback helper (Tauri only)
+  const playAudio = async (audioFileName: string) => {
+    try {
+      // Check if running in Tauri environment
+      if (!isTauri()) {
+        console.warn('Not in Tauri environment, skipping audio playback')
+        return
+      }
+
+      const resourceDirPath = await resourceDir()
+      const filePath = await join(resourceDirPath, 'audios', audioFileName)
+      const assetUrl = convertFileSrc(filePath)
+
+      console.log('Playing audio:', { filePath, assetUrl })
+
+      const audio = new Audio(assetUrl)
+      audio.volume = 0.5
+      await audio.play()
+    } catch (error) {
+      console.error('音效載入失敗:', error)
+    }
+  }
+
   // Event handlers
   const handleSelectFolder = async () => {
+    // Play audio
+    playAudio('1.mp3')
+
     try {
       const selected = await open({
         directory: true,
@@ -123,6 +151,9 @@ export default function HomePage() {
 
   const handleAnalyze = () => {
     if (selectedPath) {
+      // Play audio
+      playAudio('2.mp3')
+
       setIsLoading(true)
       router.push(`/analyze?path=${encodeURIComponent(selectedPath)}`)
     }

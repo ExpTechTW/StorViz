@@ -18,6 +18,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": [
+      "audios/*"
+    ],
     "macOS": {
       "minimumSystemVersion": "10.13",
       "entitlements": "Entitlements.plist"
@@ -35,7 +38,11 @@
       }
     ],
     "security": {
-      "csp": null,
+      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; media-src 'self' asset: http://asset.localhost; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$RESOURCE/**"]
+      },
       "capabilities": [
         {
           "identifier": "main-capability",
