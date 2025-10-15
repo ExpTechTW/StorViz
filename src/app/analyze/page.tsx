@@ -90,59 +90,34 @@ function formatBytesCompact(bytes: number): string {
   }
 }
 
-// Rebuild tree from root metadata + cached compact nodes
 function rebuildTreeFromCompactNodes(rootNode: FileNode, compactNodes: any[]): FileNode {
-  console.log('[rebuildTreeFromCompactNodes] Starting rebuild')
-  console.log('[rebuildTreeFromCompactNodes] Root:', rootNode.path)
-  console.log('[rebuildTreeFromCompactNodes] Compact nodes:', compactNodes.length)
-
-  // Step 1: Build a map of all expanded nodes (path -> full FileNode)
   const nodeMap = new Map<string, FileNode>()
 
-  // Normalize root path consistently
   const rootPathNormalized = rootNode.path.toLowerCase().replace(/\\/g, '/').replace(/\/+$/, '')
 
-  // Add root with normalized path
   const rootCopy = { ...rootNode }
   nodeMap.set(rootPathNormalized, rootCopy)
 
-  console.log('[rebuildTreeFromCompactNodes] Root will be stored at:', rootPathNormalized)
-
-  // Expand all compact nodes and add to map
   compactNodes.forEach((compactNode, index) => {
-    if (index < 3) {
-      console.log(`[rebuildTreeFromCompactNodes] Processing compact node ${index}: "${compactNode.n}", parentPath: "${rootNode.path}"`)
-    }
     expandAndAddToMap(compactNode, rootNode.path, nodeMap)
   })
 
-  console.log('[rebuildTreeFromCompactNodes] Total nodes in map:', nodeMap.size)
-
-  // Debug: Check if root is in map
-  const rootInMap = nodeMap.get(rootPathNormalized)
-  console.log('[rebuildTreeFromCompactNodes] Root found in map:', !!rootInMap)
-
-  // Step 2: Build parent-child relationships
   const childrenMap = new Map<string, FileNode[]>()
 
-  console.log('[rebuildTreeFromCompactNodes] Root normalized:', rootPathNormalized)
 
   nodeMap.forEach((node, normalizedPath) => {
     if (normalizedPath === rootPathNormalized) {
-      return // Skip root
+      return
     }
 
-    // Find parent path
     const lastSlashIndex = normalizedPath.lastIndexOf('/')
     let parentPath: string
 
     if (lastSlashIndex <= 0) {
-      // No slash - direct child of root (shouldn't happen for D:\)
       parentPath = rootPathNormalized
     } else {
       parentPath = normalizedPath.substring(0, lastSlashIndex)
 
-      // Special case: if parent is "d:" it's actually root "d:/"
       if (parentPath.length === 2 && parentPath.endsWith(':')) {
         parentPath = rootPathNormalized
       }
@@ -154,57 +129,23 @@ function rebuildTreeFromCompactNodes(rootNode: FileNode, compactNodes: any[]): F
     childrenMap.get(parentPath)!.push(node)
   })
 
-  console.log('[rebuildTreeFromCompactNodes] Children map entries:', childrenMap.size)
-  // Debug: show some parent-child relationships
-  let debugCount = 0
-  childrenMap.forEach((children, parent) => {
-    if (debugCount < 5) {
-      console.log(`  Parent "${parent}" has ${children.length} children`)
-      debugCount++
-    }
-  })
-
-  // Step 3: Assign children to all nodes
-  console.log('[rebuildTreeFromCompactNodes] Assigning children to nodes...')
   let assignedCount = 0
   nodeMap.forEach((node, normalizedPath) => {
     const children = childrenMap.get(normalizedPath) || []
     if (children.length > 0) {
       node.children = children
       assignedCount++
-      if (assignedCount <= 3) {
-        console.log(`  Assigned ${children.length} children to "${normalizedPath}"`)
-      }
     } else {
       node.children = []
     }
   })
-  console.log('[rebuildTreeFromCompactNodes] Total nodes with children:', assignedCount)
 
   const result = nodeMap.get(rootPathNormalized)
-  console.log('[rebuildTreeFromCompactNodes] Rebuild complete')
-  console.log('[rebuildTreeFromCompactNodes] Root children:', result?.children?.length || 0)
-
-  if (result && result.children) {
-    console.log('[rebuildTreeFromCompactNodes] All root children:')
-    result.children.forEach((child, index) => {
-      console.log(`  ${index + 1}. "${child.name}" - size: ${child.size} - isDir: ${child.isDirectory}`)
-    })
-  }
-
-  if (!result) {
-    console.error('[rebuildTreeFromCompactNodes] ERROR: Root not found in nodeMap!')
-  }
 
   return result || rootNode
 }
 
-// Helper: Recursively expand compact node and add all descendants to map
-let expandDebugCount = 0
 function expandAndAddToMap(compactNode: any, parentPath: string, nodeMap: Map<string, FileNode>) {
-  // Compact format: { n: name, s: size, c: children, d: isDirectory }
-
-  // Build path correctly (Windows style)
   let nodePath: string
   if (parentPath.endsWith('\\') || parentPath.endsWith('/')) {
     nodePath = `${parentPath}${compactNode.n}`
@@ -212,13 +153,7 @@ function expandAndAddToMap(compactNode: any, parentPath: string, nodeMap: Map<st
     nodePath = `${parentPath}\\${compactNode.n}`
   }
 
-  // Normalize for map key
   const normalizedPath = nodePath.toLowerCase().replace(/\\/g, '/').replace(/\/+$/, '')
-
-  if (expandDebugCount < 20) {
-    console.log(`  [expandAndAddToMap] name="${compactNode.n}", parent="${parentPath}", built="${nodePath}"`)
-    expandDebugCount++
-  }
 
   const node: FileNode = {
     name: compactNode.n,
@@ -230,114 +165,11 @@ function expandAndAddToMap(compactNode: any, parentPath: string, nodeMap: Map<st
 
   nodeMap.set(normalizedPath, node)
 
-  // Recursively process children
   if (compactNode.c && Array.isArray(compactNode.c)) {
     compactNode.c.forEach((child: any) => {
       expandAndAddToMap(child, nodePath, nodeMap)
     })
   }
-}
-
-// Build tree from root metadata and cached directory nodes - O(n) algorithm
-function buildTreeFromCache(rootMetadata: FileNode, cachedDirs: Map<string, FileNode>): FileNode {
-  console.log('[buildTreeFromCache] Starting tree build')
-  console.log('[buildTreeFromCache] Root path:', rootMetadata.path)
-  console.log('[buildTreeFromCache] Cached directories:', cachedDirs.size)
-
-  const startTime = performance.now()
-
-  // Normalize path for comparison (handle both Windows and Unix paths)
-  const normalizePath = (p: string): string => {
-    return p.replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '') // Remove trailing slashes
-  }
-
-  // Step 1: Build parent -> children map in O(n) time
-  const childrenMap = new Map<string, FileNode[]>()
-  const rootPathNormalized = normalizePath(rootMetadata.path)
-
-  cachedDirs.forEach((node) => {
-    const normalizedPath = normalizePath(node.path)
-
-    // Skip if it's the root itself
-    if (normalizedPath === rootPathNormalized) {
-      return
-    }
-
-    // Find parent path (remove last segment)
-    const lastSlashIndex = normalizedPath.lastIndexOf('/')
-
-    let parentPath: string
-
-    if (lastSlashIndex <= 0) {
-      // No slash or only at start - this is a direct child of root
-      parentPath = rootPathNormalized
-    } else {
-      // Extract parent path
-      parentPath = normalizedPath.substring(0, lastSlashIndex)
-
-      // Special case: if parent is single letter (like "d:"), it's root
-      if (parentPath.length <= 2 && parentPath.includes(':')) {
-        parentPath = rootPathNormalized
-      }
-    }
-
-    if (!childrenMap.has(parentPath)) {
-      childrenMap.set(parentPath, [])
-    }
-    childrenMap.get(parentPath)!.push(node)
-  })
-
-  // Debug: Show some parent-child relationships
-  console.log('[buildTreeFromCache] Sample parent-child relationships:')
-  let sampleCount = 0
-  childrenMap.forEach((children, parent) => {
-    if (sampleCount < 3) {
-      console.log(`  "${parent}" has ${children.length} children`)
-      sampleCount++
-    }
-  })
-
-  console.log('[buildTreeFromCache] Built parent-children map in', (performance.now() - startTime).toFixed(2), 'ms')
-  console.log('[buildTreeFromCache] Parent map has', childrenMap.size, 'entries')
-
-  // Step 2: Build tree using bottom-up approach (no recursion, no stack overflow)
-  // Create a map of all nodes (including the ones we'll build)
-  const nodeMap = new Map<string, FileNode>()
-
-  // Add root
-  nodeMap.set(rootPathNormalized, { ...rootMetadata, children: [] })
-
-  // Add all cached directories
-  cachedDirs.forEach((node) => {
-    const normalizedPath = normalizePath(node.path)
-    nodeMap.set(normalizedPath, { ...node, children: [] })
-  })
-
-  console.log('[buildTreeFromCache] Building tree bottom-up...')
-
-  // Now link children to parents using the childrenMap
-  childrenMap.forEach((children, parentPath) => {
-    const parentNode = nodeMap.get(parentPath)
-    if (parentNode) {
-      parentNode.children = children.map(child => {
-        const normalizedChildPath = normalizePath(child.path)
-        return nodeMap.get(normalizedChildPath) || child
-      })
-    }
-  })
-
-  const result = nodeMap.get(rootPathNormalized)
-
-  const totalTime = (performance.now() - startTime).toFixed(2)
-  console.log('[buildTreeFromCache] Tree built successfully in', totalTime, 'ms')
-  console.log('[buildTreeFromCache] Root children count:', result?.children?.length || 0)
-
-  if (!result) {
-    console.error('[buildTreeFromCache] Failed to build tree!')
-    return rootMetadata
-  }
-
-  return result
 }
 
 function AnalyzeContent() {
@@ -842,16 +674,6 @@ function AnalyzeContent() {
         depth,
       })
     })
-
-    // Log only depth 0 (first layer) details
-    const layer0 = layers.get(0)
-    if (layer0) {
-      console.log(`[第一層組成] Total items: ${layer0.length}`)
-      layer0.forEach((item, index) => {
-        const angleRange = (item.endAngle ?? 0) - (item.startAngle ?? 0)
-        console.log(`  ${index + 1}. "${item.name}" - path: "${item.path}" - angle: ${angleRange.toFixed(2)}°`)
-      })
-    }
 
     return result.sort((a, b) => a.depth - b.depth)
   }

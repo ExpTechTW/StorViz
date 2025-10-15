@@ -120,8 +120,6 @@ export default function HomePage() {
       const filePath = await join(resourceDirPath, 'audios', audioFileName)
       const assetUrl = convertFileSrc(filePath)
 
-      console.log('Playing audio:', { filePath, assetUrl })
-
       const audio = new Audio(assetUrl)
       audio.volume = 0.5
       await audio.play()
