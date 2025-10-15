@@ -223,11 +223,11 @@ function AnalyzeContent() {
         setScanProgress({ currentPath: path, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
 
         // Create channel for streaming batches
-        const onBatch = new Channel<{ nodes: FileNode[]; total_scanned: number; total_size: number; is_complete: boolean; root_node?: FileNode; disk_info?: { total_space: number; available_space: number; used_space: number } }>()
+        const onBatch = new Channel<{ nodes: FileNode[]; total_scanned: number; total_size: number; is_complete: boolean; root_node?: FileNode; disk_info?: { total_space: number; available_space: number; used_space: number }; current_path?: string }>()
         onBatch.onmessage = (message) => {
           // Update progress
           setScanProgress({
-            currentPath: path,
+            currentPath: message.current_path || path,
             filesScanned: message.total_scanned,
             scannedSize: message.total_size,
             estimatedTotal: 0

@@ -17,6 +17,7 @@ use filesize::PathExt;
 // Constants
 const BATCH_SIZE: usize = 10000;
 const MAX_DEPTH: usize = 100; // Increased depth limit
+const PATH_UPDATE_INTERVAL: usize = 10; // Update path display every N files
 
 // Global scan state for cancellation
 use std::sync::OnceLock;
@@ -40,6 +41,7 @@ struct PartialScanResult {
     is_complete: bool,
     root_node: Option<FileNode>,
     disk_info: Option<DiskInfo>,
+    current_path: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -59,6 +61,8 @@ struct ScanState {
     visited_inodes: Arc<Mutex<HashSet<u64>>>,
     recursion_stack: Arc<Mutex<HashSet<PathBuf>>>,
     cancelled: Arc<AtomicBool>,
+    current_path: Arc<Mutex<String>>,
+    path_update_counter: Arc<Mutex<usize>>,
 }
 
 impl ScanState {
@@ -71,6 +75,8 @@ impl ScanState {
             visited_inodes: Arc::new(Mutex::new(HashSet::new())),
             recursion_stack: Arc::new(Mutex::new(HashSet::new())),
             cancelled: Arc::new(AtomicBool::new(false)),
+            current_path: Arc::new(Mutex::new(String::new())),
+            path_update_counter: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -155,6 +161,31 @@ impl ScanState {
         } else {
             false
         }
+    }
+
+    fn set_current_path(&self, path: &str) {
+        if let Ok(mut current) = self.current_path.lock() {
+            *current = path.to_string();
+        }
+    }
+
+    fn get_current_path(&self) -> String {
+        if let Ok(current) = self.current_path.lock() {
+            current.clone()
+        } else {
+            String::new()
+        }
+    }
+
+    fn should_send_path_update(&self) -> bool {
+        if let Ok(mut counter) = self.path_update_counter.lock() {
+            *counter += 1;
+            if *counter >= PATH_UPDATE_INTERVAL {
+                *counter = 0;
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -296,7 +327,7 @@ fn cancel_scan() -> Result<(), String> {
 fn send_final_batch(channel: &Channel<PartialScanResult>, state: &ScanState, root_node: FileNode, disk_info: Option<DiskInfo>) {
     let (total_items, total_size) = state.get_stats();
     let remaining_nodes = state.clear_buffer();
-    
+
     let payload = PartialScanResult {
         nodes: remaining_nodes,
         total_scanned: total_items,
@@ -304,15 +335,17 @@ fn send_final_batch(channel: &Channel<PartialScanResult>, state: &ScanState, roo
         is_complete: true,
         root_node: Some(root_node),
         disk_info,
+        current_path: None,
     };
-    
+
     let _ = channel.send(payload);
 }
 
 fn send_batch(channel: &Channel<PartialScanResult>, state: &ScanState) {
     let (total_items, total_size) = state.get_stats();
     let nodes = state.clear_buffer();
-    
+    let current_path = state.get_current_path();
+
     let payload = PartialScanResult {
         nodes,
         total_scanned: total_items,
@@ -320,8 +353,26 @@ fn send_batch(channel: &Channel<PartialScanResult>, state: &ScanState) {
         is_complete: false,
         root_node: None,
         disk_info: None,
+        current_path: Some(current_path),
     };
-    
+
+    let _ = channel.send(payload);
+}
+
+fn send_path_update(channel: &Channel<PartialScanResult>, state: &ScanState) {
+    let (total_items, total_size) = state.get_stats();
+    let current_path = state.get_current_path();
+
+    let payload = PartialScanResult {
+        nodes: Vec::new(),
+        total_scanned: total_items,
+        total_size,
+        is_complete: false,
+        root_node: None,
+        disk_info: None,
+        current_path: Some(current_path),
+    };
+
     let _ = channel.send(payload);
 }
 
@@ -368,7 +419,15 @@ fn scan_directory_recursive(
     }
 
     let path_str = path.to_string_lossy().to_string();
-    
+
+    // Update current scanning path
+    state.set_current_path(&path_str);
+
+    // Send path update if interval reached
+    if state.should_send_path_update() {
+        send_path_update(channel, state);
+    }
+
     // Prevent scanning above the root path to avoid duplicate counting
     // Use canonicalized paths for accurate comparison
     if let Ok(canonical_root) = fs::canonicalize(root_path) {
