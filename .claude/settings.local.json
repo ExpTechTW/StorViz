@@ -8,7 +8,8 @@
       "Bash(cargo:*)",
       "Bash(taskkill:*)",
       "Bash(git restore:*)",
-      "Bash(bun run:*)"
+      "Bash(bun run:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

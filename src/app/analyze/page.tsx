@@ -156,12 +156,14 @@ function AnalyzeContent() {
 
   const handleCancelScan = async () => {
     try {
+      console.log('🛑 Cancelling scan...')
       await invoke('cancel_scan')
+      console.log('✅ Scan cancelled successfully')
       setIsLoading(false)
       setScanProgress(null)
       router.back()
     } catch (error) {
-      console.error('取消掃描失敗:', error)
+      console.error('❌ 取消掃描失敗:', error)
     }
   }
 
@@ -218,6 +220,8 @@ function AnalyzeContent() {
 
     const scanFolder = async () => {
       try {
+        console.log('🚀 Starting scan:', path)
+
         scanningRef.current = true
         setIsLoading(true)
         setScanProgress({ currentPath: path, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
@@ -225,17 +229,46 @@ function AnalyzeContent() {
         // Create channel for streaming batches
         const onBatch = new Channel<{ nodes: FileNode[]; total_scanned: number; total_size: number; is_complete: boolean; root_node?: FileNode; disk_info?: { total_space: number; available_space: number; used_space: number }; current_path?: string }>()
         onBatch.onmessage = (message) => {
-          // Don't use disk_info for progress calculation as it's inaccurate
-          // Progress bar will show indeterminate state instead
+          // Use disk_info.used_space as estimated total
+          // macOS: Now correctly sums all APFS partitions
+          // Windows/Linux: Direct disk usage
+          const estimatedTotal = message.disk_info ? message.disk_info.used_space : 0
+
+          // Log progress update
+          const progress = estimatedTotal > 0 ? (message.total_size / estimatedTotal * 100).toFixed(2) : 0
+          console.log('📊 Scan Progress:', {
+            filesScanned: message.total_scanned.toLocaleString(),
+            scannedSize: `${(message.total_size / 1024 / 1024 / 1024).toFixed(2)} GB`,
+            estimatedTotal: estimatedTotal > 0 ? `${(estimatedTotal / 1024 / 1024 / 1024).toFixed(2)} GB` : 'N/A',
+            progress: estimatedTotal > 0 ? `${progress}%` : 'N/A',
+            currentPath: message.current_path,
+            isComplete: message.is_complete,
+            diskInfo: message.disk_info ? {
+              totalSpace: `${(message.disk_info.total_space / 1024 / 1024 / 1024).toFixed(2)} GB`,
+              usedSpace: `${(message.disk_info.used_space / 1024 / 1024 / 1024).toFixed(2)} GB`,
+              availableSpace: `${(message.disk_info.available_space / 1024 / 1024 / 1024).toFixed(2)} GB`,
+            } : null
+          })
+
           setScanProgress({
             currentPath: message.current_path || path,
             filesScanned: message.total_scanned,
             scannedSize: message.total_size,
-            estimatedTotal: 0
+            estimatedTotal
           })
 
           // If complete, use root_node from the message
           if (message.is_complete && message.root_node) {
+            console.log('✅ Scan Complete!', {
+              totalFiles: message.total_scanned.toLocaleString(),
+              totalSize: `${(message.total_size / 1024 / 1024 / 1024).toFixed(2)} GB`,
+              diskInfo: message.disk_info ? {
+                totalSpace: `${(message.disk_info.total_space / 1024 / 1024 / 1024).toFixed(2)} GB`,
+                usedSpace: `${(message.disk_info.used_space / 1024 / 1024 / 1024).toFixed(2)} GB`,
+                availableSpace: `${(message.disk_info.available_space / 1024 / 1024 / 1024).toFixed(2)} GB`
+              } : 'N/A'
+            })
+
             setData(message.root_node)
             setCurrentLevel(message.root_node)
             setBreadcrumb([message.root_node])
@@ -255,11 +288,12 @@ function AnalyzeContent() {
         // Start streaming scan (returns immediately, scanning in background)
         await invoke('scan_directory_streaming', { path, onBatch })
       } catch (error) {
-        console.error('掃描失敗:', error)
+        console.error('❌ 掃描失敗:', error)
         setIsLoading(false)
         setScanProgress(null)
       } finally {
         scanningRef.current = false
+        console.log('🏁 Scan finished (cleanup)')
       }
     }
 
@@ -545,6 +579,29 @@ function AnalyzeContent() {
           {scanProgress && scanProgress.filesScanned > 0 && (
             <div className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-6 space-y-4 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:shadow-lg group relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+              {/* Progress bar - only show for root directory scans */}
+              {scanProgress.estimatedTotal > 0 && (
+                <div className="space-y-2 relative z-10">
+                  <div className="flex justify-between items-center text-sm mb-2">
+                    <span className="text-muted-foreground">掃描進度（預估）</span>
+                    <span className="font-mono text-primary font-semibold">
+                      {Math.min(100, Math.round((scanProgress.scannedSize / scanProgress.estimatedTotal) * 100))}%
+                    </span>
+                  </div>
+                  <div className="h-3 bg-muted rounded-full overflow-hidden w-full">
+                    <div
+                      className="h-full bg-primary transition-all duration-300 ease-out"
+                      style={{
+                        width: `${Math.min(100, (scanProgress.scannedSize / scanProgress.estimatedTotal) * 100)}%`
+                      }}
+                    />
+                  </div>
+                  {scanProgress.scannedSize > scanProgress.estimatedTotal && (
+                    <p className="text-xs text-muted-foreground">注意：實際大小可能因硬連結等因素超過預估</p>
+                  )}
+                </div>
+              )}
 
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 relative z-10">
