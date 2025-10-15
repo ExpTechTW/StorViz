@@ -1,6 +1,5 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-// Modified to trigger recompile
 
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -8,6 +7,10 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
 use rayon::prelude::*;
+
+// Constants
+const BATCH_SIZE: usize = 10000;
+const MAX_DEPTH: usize = 10;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FileNode {
@@ -28,74 +31,108 @@ struct PartialScanResult {
     root_node: Option<FileNode>,
 }
 
+// Helper struct for shared state
+#[derive(Clone)]
+struct ScanState {
+    counter: Arc<Mutex<u64>>,
+    scanned_size: Arc<Mutex<u64>>,
+    batch_buffer: Arc<Mutex<Vec<FileNode>>>,
+}
+
+impl ScanState {
+    fn new() -> Self {
+        Self {
+            counter: Arc::new(Mutex::new(0)),
+            scanned_size: Arc::new(Mutex::new(0)),
+            batch_buffer: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    fn increment_counter(&self) {
+        if let Ok(mut count) = self.counter.lock() {
+            *count += 1;
+        }
+    }
+
+    fn add_size(&self, size: u64) {
+        if let Ok(mut total) = self.scanned_size.lock() {
+            *total += size;
+        }
+    }
+
+    fn add_to_buffer(&self, node: FileNode) -> bool {
+        if let Ok(mut buffer) = self.batch_buffer.lock() {
+            buffer.push(node);
+            buffer.len() >= BATCH_SIZE
+        } else {
+            false
+        }
+    }
+
+    fn get_stats(&self) -> (u64, u64) {
+        let count = self.counter.lock().unwrap();
+        let size = self.scanned_size.lock().unwrap();
+        (*count, *size)
+    }
+
+    fn clear_buffer(&self) -> Vec<FileNode> {
+        if let Ok(mut buffer) = self.batch_buffer.lock() {
+            buffer.drain(..).collect()
+        } else {
+            Vec::new()
+        }
+    }
+}
+
 #[tauri::command]
 async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanResult>) -> Result<(), String> {
     let root_path = Path::new(&path);
-
     if !root_path.exists() {
         return Err("路徑不存在".to_string());
     }
 
-    // Clone variables for the background task
-    let path_clone = path.clone();
-
-    // Spawn blocking task in a separate thread to avoid blocking the event loop
+    // Spawn background scanning task
     std::thread::spawn(move || {
-        let root_path = Path::new(&path_clone);
-        let counter = Arc::new(Mutex::new(0u64));
-        let scanned_size = Arc::new(Mutex::new(0u64));
-        let batch_buffer = Arc::new(Mutex::new(Vec::new()));
-        let batch_size = 10000;
-
-        // Scan recursively and send batches via channel
-        if let Ok(root_node) = scan_dir_streaming_channel(
-            root_path,
-            &on_batch,
-            counter.clone(),
-            scanned_size.clone(),
-            batch_buffer.clone(),
-            batch_size
-        ) {
-            // Build limited depth root node (10 levels for visualization)
-            let limited_root = build_limited_depth_node(&root_node, 10);
-
-            // Send final batch if there are remaining items
-            {
-                let mut buffer = batch_buffer.lock().unwrap();
-                let total_items = *counter.lock().unwrap();
-                let total_size = *scanned_size.lock().unwrap();
-
-                if !buffer.is_empty() {
-                    let payload = PartialScanResult {
-                        nodes: buffer.clone(),
-                        total_scanned: total_items,
-                        total_size,
-                        is_complete: true,
-                        root_node: Some(limited_root.clone()),
-                    };
-
-                    // Send via channel
-                    let _ = on_batch.send(payload);
-                    buffer.clear();
-                } else {
-                    // Send completion message with root node even if buffer is empty
-                    let payload = PartialScanResult {
-                        nodes: Vec::new(),
-                        total_scanned: total_items,
-                        total_size,
-                        is_complete: true,
-                        root_node: Some(limited_root),
-                    };
-
-                    let _ = on_batch.send(payload);
-                }
-            }
-
+        let state = ScanState::new();
+        let root_path = Path::new(&path);
+        
+        if let Ok(root_node) = scan_directory_recursive(root_path, &on_batch, &state) {
+            let limited_root = build_limited_depth_node(&root_node, MAX_DEPTH);
+            send_final_batch(&on_batch, &state, limited_root);
         }
     });
 
-    // Return immediately, scanning happens in background
     Ok(())
+}
+
+fn send_final_batch(channel: &Channel<PartialScanResult>, state: &ScanState, root_node: FileNode) {
+    let (total_items, total_size) = state.get_stats();
+    let remaining_nodes = state.clear_buffer();
+    
+    let payload = PartialScanResult {
+        nodes: remaining_nodes,
+        total_scanned: total_items,
+        total_size,
+        is_complete: true,
+        root_node: Some(root_node),
+    };
+    
+    let _ = channel.send(payload);
+}
+
+fn send_batch(channel: &Channel<PartialScanResult>, state: &ScanState) {
+    let (total_items, total_size) = state.get_stats();
+    let nodes = state.clear_buffer();
+    
+    let payload = PartialScanResult {
+        nodes,
+        total_scanned: total_items,
+        total_size,
+        is_complete: false,
+        root_node: None,
+    };
+    
+    let _ = channel.send(payload);
 }
 
 fn build_limited_depth_node(node: &FileNode, max_depth: usize) -> FileNode {
@@ -103,32 +140,22 @@ fn build_limited_depth_node(node: &FileNode, max_depth: usize) -> FileNode {
 }
 
 fn build_limited_depth_node_recursive(node: &FileNode, current_depth: usize, max_depth: usize) -> FileNode {
-    // If we've reached max depth, return node without children
     if current_depth >= max_depth {
         return FileNode {
             name: node.name.clone(),
             size: node.size,
             path: node.path.clone(),
-            children: if node.is_directory {
-                Some(Vec::new()) // Empty array indicates "more content available"
-            } else {
-                None
-            },
+            children: if node.is_directory { Some(Vec::new()) } else { None },
             is_directory: node.is_directory,
         };
     }
 
-    // Otherwise, recursively process children
-    let limited_children = if let Some(children) = &node.children {
-        Some(
-            children
-                .iter()
-                .map(|child| build_limited_depth_node_recursive(child, current_depth + 1, max_depth))
-                .collect()
-        )
-    } else {
-        None
-    };
+    let limited_children = node.children.as_ref().map(|children| {
+        children
+            .iter()
+            .map(|child| build_limited_depth_node_recursive(child, current_depth + 1, max_depth))
+            .collect()
+    });
 
     FileNode {
         name: node.name.clone(),
@@ -139,34 +166,20 @@ fn build_limited_depth_node_recursive(node: &FileNode, current_depth: usize, max
     }
 }
 
-fn scan_dir_streaming_channel(
+fn scan_directory_recursive(
     path: &Path,
     channel: &Channel<PartialScanResult>,
-    counter: Arc<Mutex<u64>>,
-    scanned_size: Arc<Mutex<u64>>,
-    batch_buffer: Arc<Mutex<Vec<FileNode>>>,
-    batch_size: usize,
+    state: &ScanState,
 ) -> Result<FileNode, String> {
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
-    let name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("")
-        .to_string();
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
     let path_str = path.to_string_lossy().to_string();
 
-    // Update counter
-    {
-        let mut count = counter.lock().unwrap();
-        *count += 1;
-    }
+    state.increment_counter();
 
     if metadata.is_file() {
         let file_size = metadata.len();
-        {
-            let mut size = scanned_size.lock().unwrap();
-            *size += file_size;
-        }
+        state.add_size(file_size);
 
         let node = FileNode {
             name,
@@ -176,49 +189,21 @@ fn scan_dir_streaming_channel(
             is_directory: false,
         };
 
-        // Add to batch buffer
-        {
-            let mut buffer = batch_buffer.lock().unwrap();
-            buffer.push(node.clone());
-
-            // Send batch if buffer is full
-            if buffer.len() >= batch_size {
-                let total_items = *counter.lock().unwrap();
-                let total_size = *scanned_size.lock().unwrap();
-
-                let payload = PartialScanResult {
-                    nodes: buffer.clone(),
-                    total_scanned: total_items,
-                    total_size,
-                    is_complete: false,
-                    root_node: None,
-                };
-
-                // Send via channel
-                let _ = channel.send(payload);
-                buffer.clear();
-            }
+        if state.add_to_buffer(node.clone()) {
+            send_batch(channel, state);
         }
 
         return Ok(node);
     }
 
-    // 掃描目錄 - 使用並行處理加速
+    // Scan directory with parallel processing
     if let Ok(entries) = fs::read_dir(path) {
         let entries_vec: Vec<_> = entries.flatten().collect();
-
-        // 使用 rayon 並行處理子項目
+        
         let children: Vec<FileNode> = entries_vec
             .par_iter()
             .filter_map(|entry| {
-                scan_dir_streaming_channel(
-                    &entry.path(),
-                    channel,
-                    counter.clone(),
-                    scanned_size.clone(),
-                    batch_buffer.clone(),
-                    batch_size
-                ).ok()
+                scan_directory_recursive(&entry.path(), channel, state).ok()
             })
             .collect();
 
