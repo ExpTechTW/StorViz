@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { invoke, Channel } from '@tauri-apps/api/core'
 import { getFileTypeInfo } from '@/lib/fileTypeUtils'
+import { updateStats } from '@/lib/statsStorage'
 
 interface FileNode {
   name: string
@@ -214,6 +215,9 @@ function AnalyzeContent() {
             } : null)
             setIsLoading(false)
             setScanProgress(null)
+
+            // 更新累計統計數據
+            updateStats(message.total_scanned, message.total_size)
           }
         }
 

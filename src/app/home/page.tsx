@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { open } from '@tauri-apps/plugin-dialog'
 import { FolderOpen, HardDrive, BarChart3, Zap, Shield, Eye, Layers } from 'lucide-react'
+import { StatsDisplay } from '@/components/StatsDisplay'
 
 // Feature card component
 interface FeatureCardProps {
@@ -36,7 +37,6 @@ export default function HomePage() {
   const features = [
     { icon: <Eye className="w-3 h-3 text-primary" />, title: '視覺化分析', description: '直觀的圓餅圖顯示' },
     { icon: <Layers className="w-3 h-3 text-primary" />, title: '層次分析', description: '多層資料夾結構' },
-    { icon: <Zap className="w-3 h-3 text-primary" />, title: '快速掃描', description: '高效能檔案掃描' },
     { icon: <Shield className="w-3 h-3 text-primary" />, title: '安全可靠', description: '本地處理保護隱私' }
   ]
 
@@ -125,8 +125,9 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Features Section */}
-        <div className="grid grid-cols-2 gap-2 max-w-sm mx-auto">
+        {/* Statistics and Features Section - Combined */}
+        <div className="grid grid-cols-3 grid-rows-2 gap-2 max-w-2xl mx-auto">
+          <StatsDisplay />
           {features.map((feature, index) => (
             <FeatureCard
               key={index}
