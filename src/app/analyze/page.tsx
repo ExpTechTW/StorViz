@@ -582,7 +582,7 @@ function AnalyzeContent() {
 
               {/* Current path */}
               <div className="pt-4 border-t border-border relative z-10">
-                <p className="text-xs text-muted-foreground mb-1">當前路徑</p>
+                <p className="text-xs text-muted-foreground mb-1">目前掃描路徑</p>
                 <p
                   className="text-sm text-foreground font-mono overflow-hidden text-ellipsis"
                   style={{
