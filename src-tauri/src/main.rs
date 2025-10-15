@@ -214,49 +214,85 @@ fn get_disk_info(path: &Path) -> Option<DiskInfo> {
 
     #[cfg(target_os = "macos")]
     {
-        // macOS APFS: Sum used space from all related partitions
-        // APFS volumes share a storage pool, so:
-        // - total_space is same for all (shared pool size)
-        // - available_space is same for all (shared free space)
-        // - But each partition has its own used space - we need to SUM these
-
-        let mut total_space = 0u64;
-        let mut total_available = 0u64;
-        let mut total_used = 0u64;
-        let mut found_any = false;
+        // First, try to find an exact or most specific mount point match
+        // This handles external drives before falling back to root
+        let mut best_match: Option<(&sysinfo::Disk, usize)> = None;
 
         for disk in disks.list() {
             let disk_path = disk.mount_point().to_string_lossy();
 
-            // For root scan, sum all system-related volumes
-            if path_str == "/" {
-                if disk_path == "/" ||
-                   disk_path.starts_with("/System/Volumes/Data") ||
-                   disk_path.starts_with("/System/Volumes/Preboot") ||
-                   disk_path.starts_with("/System/Volumes/VM") ||
-                   disk_path.starts_with("/System/Volumes/Update") {
+            // Check if path starts with this mount point
+            if path_str.starts_with(&*disk_path) {
+                let match_length = disk_path.len();
 
-                    let used = disk.total_space() - disk.available_space();
-                    println!("📊 macOS partition {}: used={} GB",
-                        disk_path,
-                        used / 1024 / 1024 / 1024
+                // Keep the longest (most specific) match
+                if let Some((_, current_length)) = best_match {
+                    if match_length > current_length {
+                        best_match = Some((disk, match_length));
+                    }
+                } else {
+                    best_match = Some((disk, match_length));
+                }
+            }
+        }
+
+        // If we found a best match
+        if let Some((matched_disk, _)) = best_match {
+            let disk_path = matched_disk.mount_point().to_string_lossy();
+
+            // For root scan ("/"), sum all system-related volumes
+            if path_str == "/" && disk_path == "/" {
+                let mut total_space = 0u64;
+                let mut total_available = 0u64;
+                let mut total_used = 0u64;
+                let mut found_any = false;
+
+                for disk in disks.list() {
+                    let dp = disk.mount_point().to_string_lossy();
+
+                    if dp == "/" ||
+                       dp.starts_with("/System/Volumes/Data") ||
+                       dp.starts_with("/System/Volumes/Preboot") ||
+                       dp.starts_with("/System/Volumes/VM") ||
+                       dp.starts_with("/System/Volumes/Update") {
+
+                        let used = disk.total_space() - disk.available_space();
+                        println!("📊 macOS partition {}: used={} GB",
+                            dp,
+                            used / 1024 / 1024 / 1024
+                        );
+
+                        // Sum the used space from each partition
+                        total_used += used;
+
+                        // Total and available are shared across all APFS volumes
+                        total_space = disk.total_space();
+                        total_available = disk.available_space();
+                        found_any = true;
+                    }
+                }
+
+                if found_any {
+                    println!("✅ Total macOS disk usage: {} GB (total: {} GB, available: {} GB)",
+                        total_used / 1024 / 1024 / 1024,
+                        total_space / 1024 / 1024 / 1024,
+                        total_available / 1024 / 1024 / 1024
                     );
 
-                    // Sum the used space from each partition
-                    total_used += used;
-
-                    // Total and available are shared across all APFS volumes
-                    total_space = disk.total_space();
-                    total_available = disk.available_space();
-                    found_any = true;
+                    return Some(DiskInfo {
+                        total_space,
+                        available_space: total_available,
+                        used_space: total_used,
+                    });
                 }
-            } else if path_str.starts_with(&*disk_path) {
-                // For non-root paths (including external drives), use specific disk
-                let total = disk.total_space();
-                let available = disk.available_space();
+            } else {
+                // For non-root paths (including external drives), use the specific disk
+                let total = matched_disk.total_space();
+                let available = matched_disk.available_space();
                 let used = total - available;
 
-                println!("📊 External disk info for {}: total={} GB, available={} GB, used={} GB",
+                println!("📊 Disk info for '{}' (mount: {}): total={} GB, available={} GB, used={} GB",
+                    path_str,
                     disk_path,
                     total / 1024 / 1024 / 1024,
                     available / 1024 / 1024 / 1024,
@@ -269,20 +305,6 @@ fn get_disk_info(path: &Path) -> Option<DiskInfo> {
                     used_space: used,
                 });
             }
-        }
-
-        if found_any {
-            println!("✅ Total macOS disk usage: {} GB (total: {} GB, available: {} GB)",
-                total_used / 1024 / 1024 / 1024,
-                total_space / 1024 / 1024 / 1024,
-                total_available / 1024 / 1024 / 1024
-            );
-
-            return Some(DiskInfo {
-                total_space,
-                available_space: total_available,
-                used_space: total_used,
-            });
         }
     }
 

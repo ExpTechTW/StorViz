@@ -587,7 +587,7 @@ function AnalyzeContent() {
                 return (
                   <div className="space-y-2 relative z-10">
                     <div className="flex justify-between items-center text-sm mb-2">
-                      <span className="text-muted-foreground">掃描進度（預估）</span>
+                      <span className="text-muted-foreground">掃描進度</span>
                       <span className="font-mono text-primary font-semibold">
                         {Math.round(displayPercentage)}%
                       </span>
