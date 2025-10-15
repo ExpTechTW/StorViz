@@ -3,7 +3,28 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { open } from '@tauri-apps/plugin-dialog'
-import { FolderOpen, HardDrive, BarChart3, Zap, Shield, Eye, Layers, TrendingUp } from 'lucide-react'
+import { FolderOpen, HardDrive, BarChart3, Zap, Shield, Eye, Layers } from 'lucide-react'
+
+// Feature card component
+interface FeatureCardProps {
+  icon: React.ReactNode
+  title: string
+  description: string
+}
+
+function FeatureCard({ icon, title, description }: FeatureCardProps) {
+  return (
+    <div className="bg-card/50 backdrop-blur-sm rounded-md border border-border/40 p-2 flex items-center gap-2 hover:bg-card/70 transition-all duration-300 hover:scale-[1.02] group">
+      <div className="w-6 h-6 bg-primary/10 rounded-md flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-300 flex-shrink-0">
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <h3 className="text-xs font-semibold text-foreground">{title}</h3>
+        <p className="text-[10px] text-muted-foreground leading-tight">{description}</p>
+      </div>
+    </div>
+  )
+}
 
 export default function HomePage() {
   const router = useRouter()
@@ -11,15 +32,20 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
-  // Track mouse position for cursor glow effect with throttling
+  // Feature data
+  const features = [
+    { icon: <Eye className="w-3 h-3 text-primary" />, title: '視覺化分析', description: '直觀的圓餅圖顯示' },
+    { icon: <Layers className="w-3 h-3 text-primary" />, title: '層次分析', description: '多層資料夾結構' },
+    { icon: <Zap className="w-3 h-3 text-primary" />, title: '快速掃描', description: '高效能檔案掃描' },
+    { icon: <Shield className="w-3 h-3 text-primary" />, title: '安全可靠', description: '本地處理保護隱私' }
+  ]
+
+  // Mouse tracking for cursor glow effect
   useEffect(() => {
     let animationFrame: number
     
     const handleMouseMove = (e: MouseEvent) => {
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame)
-      }
-      
+      if (animationFrame) cancelAnimationFrame(animationFrame)
       animationFrame = requestAnimationFrame(() => {
         setMousePosition({ x: e.clientX, y: e.clientY })
       })
@@ -28,12 +54,11 @@ export default function HomePage() {
     window.addEventListener('mousemove', handleMouseMove)
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame)
-      }
+      if (animationFrame) cancelAnimationFrame(animationFrame)
     }
   }, [])
 
+  // Event handlers
   const handleSelectFolder = async () => {
     try {
       const selected = await open({
@@ -41,7 +66,6 @@ export default function HomePage() {
         multiple: false,
         title: 'Select folder to analyze',
       })
-
       if (selected && typeof selected === 'string') {
         setSelectedPath(selected)
       }
@@ -101,47 +125,16 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Features Section - 2x2 Grid with Horizontal Layout */}
+        {/* Features Section */}
         <div className="grid grid-cols-2 gap-2 max-w-sm mx-auto">
-          <div className="bg-card/50 backdrop-blur-sm rounded-md border border-border/40 p-2 flex items-center gap-2 hover:bg-card/70 transition-all duration-300 hover:scale-[1.02] group">
-            <div className="w-6 h-6 bg-primary/10 rounded-md flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-300 flex-shrink-0">
-              <Eye className="w-3 h-3 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-xs font-semibold text-foreground">視覺化分析</h3>
-              <p className="text-[10px] text-muted-foreground leading-tight">直觀的圓餅圖顯示</p>
-            </div>
-          </div>
-          
-          <div className="bg-card/50 backdrop-blur-sm rounded-md border border-border/40 p-2 flex items-center gap-2 hover:bg-card/70 transition-all duration-300 hover:scale-[1.02] group">
-            <div className="w-6 h-6 bg-primary/10 rounded-md flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-300 flex-shrink-0">
-              <Layers className="w-3 h-3 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-xs font-semibold text-foreground">層次分析</h3>
-              <p className="text-[10px] text-muted-foreground leading-tight">多層資料夾結構</p>
-            </div>
-          </div>
-          
-          <div className="bg-card/50 backdrop-blur-sm rounded-md border border-border/40 p-2 flex items-center gap-2 hover:bg-card/70 transition-all duration-300 hover:scale-[1.02] group">
-            <div className="w-6 h-6 bg-primary/10 rounded-md flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-300 flex-shrink-0">
-              <Zap className="w-3 h-3 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-xs font-semibold text-foreground">快速掃描</h3>
-              <p className="text-[10px] text-muted-foreground leading-tight">高效能檔案掃描</p>
-            </div>
-          </div>
-          
-          <div className="bg-card/50 backdrop-blur-sm rounded-md border border-border/40 p-2 flex items-center gap-2 hover:bg-card/70 transition-all duration-300 hover:scale-[1.02] group">
-            <div className="w-6 h-6 bg-primary/10 rounded-md flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-300 flex-shrink-0">
-              <Shield className="w-3 h-3 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-xs font-semibold text-foreground">安全可靠</h3>
-              <p className="text-[10px] text-muted-foreground leading-tight">本地處理保護隱私</p>
-            </div>
-          </div>
+          {features.map((feature, index) => (
+            <FeatureCard
+              key={index}
+              icon={feature.icon}
+              title={feature.title}
+              description={feature.description}
+            />
+          ))}
         </div>
 
         {/* Main Card - Compact & Enhanced */}
@@ -169,9 +162,7 @@ export default function HomePage() {
               {selectedPath && (
                 <div className="p-2 bg-gradient-to-r from-muted/50 to-muted/30 rounded-md border border-border/30">
                   <p className="text-[10px] text-muted-foreground mb-1">已選擇：</p>
-                  <p className="text-[10px] text-foreground font-mono break-all">
-                    {selectedPath}
-                  </p>
+                  <p className="text-[10px] text-foreground font-mono break-all">{selectedPath}</p>
                 </div>
               )}
 
