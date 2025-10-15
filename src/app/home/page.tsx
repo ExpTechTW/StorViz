@@ -37,8 +37,6 @@ export default function HomePage() {
   const [selectedPath, setSelectedPath] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  const [showCards, setShowCards] = useState(true)
-  const [showButtons, setShowButtons] = useState(false)
 
   // 縮短路徑顯示 - 智能省略，保留開頭和最後兩個資料夾
   const getDisplayPath = (path: string) => {
@@ -86,26 +84,6 @@ export default function HomePage() {
     }
   }, [])
 
-  // 處理卡片切換動畫 - 1秒淡出後才顯示下一組
-  useEffect(() => {
-    if (selectedPath) {
-      // 選擇路徑後，隱藏 6 個卡片
-      setShowCards(false)
-      // 1 秒後顯示按鈕組
-      const timer = setTimeout(() => {
-        setShowButtons(true)
-      }, 1000)
-      return () => clearTimeout(timer)
-    } else {
-      // 清空路徑後，隱藏按鈕組
-      setShowButtons(false)
-      // 1 秒後顯示 6 個卡片
-      const timer = setTimeout(() => {
-        setShowCards(true)
-      }, 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [selectedPath])
 
   // Audio playback helper (Tauri only)
   const playAudio = async (audioFileName: string) => {
@@ -204,7 +182,7 @@ export default function HomePage() {
         {/* 卡片切換容器 */}
         <div className="relative" style={{ minHeight: '200px' }}>
           {/* Statistics & Features - 第一組 */}
-          <div className={`space-y-3 ${showCards ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-75 pointer-events-none invisible'}`} style={{ transition: 'opacity 1s ease-in-out, transform 1s ease-in-out, visibility 0s linear 1s' }}>
+          <div className={`space-y-3 ${!selectedPath ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-75 pointer-events-none invisible'}`} style={{ transition: 'opacity 0.5s ease-in-out, transform 0.5s ease-in-out' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 200px)', gap: '12px', justifyContent: 'center' }}>
               <StatsDisplay />
             </div>
@@ -221,8 +199,8 @@ export default function HomePage() {
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button
                 onClick={handleSelectFolder}
-                className="bg-gradient-to-br from-primary/20 to-primary/10 backdrop-blur-md rounded-lg border-2 border-primary/50 p-3 flex items-center gap-3 hover:from-primary/30 hover:to-primary/15 hover:border-primary/70 transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-primary/30 group relative overflow-hidden animate-pulse"
-                style={{ width: '200px', animationDuration: '3s' }}
+                className="bg-gradient-to-br from-primary/30 to-primary/15 backdrop-blur-md rounded-lg border-2 border-primary/60 p-3 flex items-center gap-3 hover:from-primary/40 hover:to-primary/20 hover:border-primary/80 transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-primary/40 group relative overflow-hidden"
+                style={{ width: '200px', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-shimmer"></div>
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -238,7 +216,7 @@ export default function HomePage() {
           </div>
 
           {/* 已選擇路徑卡片和按鈕 - 第二組 */}
-          <div className={`absolute ${showButtons ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-75 pointer-events-none invisible'}`} style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)', transition: 'opacity 1s ease-in-out, transform 1s ease-in-out, visibility 0s linear 1s' }}>
+          <div className={`absolute ${selectedPath ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-75 pointer-events-none invisible'}`} style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)', transition: 'opacity 0.5s ease-in-out, transform 0.5s ease-in-out' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
               {selectedPath && (
                 <div className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-500 hover:shadow-lg group relative overflow-hidden" style={{ width: '412px' }}>
@@ -263,8 +241,8 @@ export default function HomePage() {
                 <button
                   onClick={handleAnalyze}
                   disabled={!selectedPath || isLoading}
-                  className="bg-gradient-to-br from-primary/20 to-primary/10 backdrop-blur-md rounded-lg border-2 border-primary/50 p-3 flex items-center gap-3 hover:from-primary/30 hover:to-primary/15 hover:border-primary/70 transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-primary/30 group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:from-muted/20 disabled:to-muted/10 disabled:border-muted/30 animate-pulse"
-                  style={{ width: '200px', animationDuration: '3s' }}
+                  className="bg-gradient-to-br from-primary/30 to-primary/15 backdrop-blur-md rounded-lg border-2 border-primary/60 p-3 flex items-center gap-3 hover:from-primary/40 hover:to-primary/20 hover:border-primary/80 transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-primary/40 group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:from-muted/20 disabled:to-muted/10 disabled:border-muted/30"
+                  style={{ width: '200px', animation: (!selectedPath || isLoading) ? 'none' : 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-shimmer"></div>
                   <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
