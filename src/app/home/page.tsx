@@ -189,32 +189,20 @@ export default function HomePage() {
                 />
               ))}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 200px)', gap: '12px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button
                 onClick={handleSelectFolder}
-                className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg group relative overflow-hidden"
+                className="bg-gradient-to-br from-primary/20 to-primary/10 backdrop-blur-md rounded-lg border-2 border-primary/50 p-3 flex items-center gap-3 hover:from-primary/30 hover:to-primary/15 hover:border-primary/70 transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-primary/30 group relative overflow-hidden animate-pulse"
+                style={{ width: '200px', animationDuration: '3s' }}
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300 shadow-sm">
-                  <FolderOpen className="w-4 h-4 text-primary" />
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-shimmer"></div>
+                <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/40 to-primary/20 rounded-lg flex items-center justify-center group-hover:from-primary/60 group-hover:to-primary/30 transition-all duration-300 shadow-sm group-hover:scale-110">
+                  <FolderOpen className="w-4 h-4 text-primary-foreground drop-shadow-lg" />
                 </div>
                 <div className="relative z-10">
-                  <h3 className="text-sm font-bold text-foreground mb-1">瀏覽資料夾</h3>
-                  <p className="text-[10px] text-muted-foreground">選擇分析目標</p>
-                </div>
-              </button>
-
-              <button
-                disabled
-                className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 opacity-50 cursor-not-allowed group relative overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0"></div>
-                <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center shadow-sm">
-                  <BarChart3 className="w-4 h-4 text-primary" />
-                </div>
-                <div className="relative z-10">
-                  <h3 className="text-sm font-bold text-foreground mb-1">開始分析</h3>
-                  <p className="text-[10px] text-muted-foreground">執行掃描任務</p>
+                  <h3 className="text-sm font-bold text-foreground mb-1 group-hover:text-primary transition-colors">瀏覽資料夾</h3>
+                  <p className="text-[10px] text-muted-foreground group-hover:text-foreground/80 transition-colors">選擇分析目標</p>
                 </div>
               </button>
             </div>
@@ -242,39 +230,29 @@ export default function HomePage() {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 200px)', gap: '12px', justifyContent: 'center' }}>
-                <button
-                  onClick={handleSelectFolder}
-                  className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg group relative overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300 shadow-sm">
-                    <FolderOpen className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="relative z-10">
-                    <h3 className="text-sm font-bold text-foreground mb-1">瀏覽資料夾</h3>
-                    <p className="text-[10px] text-muted-foreground">選擇分析目標</p>
-                  </div>
-                </button>
-
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <button
                   onClick={handleAnalyze}
                   disabled={!selectedPath || isLoading}
-                  className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="bg-gradient-to-br from-primary/20 to-primary/10 backdrop-blur-md rounded-lg border-2 border-primary/50 p-3 flex items-center gap-3 hover:from-primary/30 hover:to-primary/15 hover:border-primary/70 transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-primary/30 group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:from-muted/20 disabled:to-muted/10 disabled:border-muted/30 animate-pulse"
+                  style={{ width: '200px', animationDuration: '3s' }}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300 shadow-sm">
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-shimmer"></div>
+                  <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/40 to-primary/20 rounded-lg flex items-center justify-center group-hover:from-primary/60 group-hover:to-primary/30 transition-all duration-300 shadow-sm group-hover:scale-110">
                     {isLoading ? (
-                      <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                      <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
                     ) : (
-                      <BarChart3 className="w-4 h-4 text-primary" />
+                      <BarChart3 className="w-4 h-4 text-primary-foreground drop-shadow-lg" />
                     )}
                   </div>
                   <div className="relative z-10">
-                    <h3 className="text-sm font-bold text-foreground mb-1">
+                    <h3 className="text-sm font-bold text-foreground mb-1 group-hover:text-primary transition-colors">
                       {isLoading ? '分析中...' : '開始分析'}
                     </h3>
-                    <p className="text-[10px] text-muted-foreground">執行掃描任務</p>
+                    <p className="text-[10px] text-muted-foreground group-hover:text-foreground/80 transition-colors">
+                      {isLoading ? '處理中' : '執行掃描'}
+                    </p>
                   </div>
                 </button>
               </div>
