@@ -6,6 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::ipc::Channel;
 use rayon::prelude::*;
 use sysinfo::Disks;
@@ -16,6 +17,10 @@ use filesize::PathExt;
 // Constants
 const BATCH_SIZE: usize = 10000;
 const MAX_DEPTH: usize = 100; // Increased depth limit
+
+// Global scan state for cancellation
+use std::sync::OnceLock;
+static CURRENT_SCAN_STATE: OnceLock<Arc<Mutex<Option<ScanState>>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FileNode {
@@ -53,6 +58,7 @@ struct ScanState {
     #[cfg(unix)]
     visited_inodes: Arc<Mutex<HashSet<u64>>>,
     recursion_stack: Arc<Mutex<HashSet<PathBuf>>>,
+    cancelled: Arc<AtomicBool>,
 }
 
 impl ScanState {
@@ -64,7 +70,16 @@ impl ScanState {
             #[cfg(unix)]
             visited_inodes: Arc::new(Mutex::new(HashSet::new())),
             recursion_stack: Arc::new(Mutex::new(HashSet::new())),
+            cancelled: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Relaxed)
+    }
+
+    fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Relaxed)
     }
 
     fn increment_counter(&self) {
@@ -233,6 +248,13 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
     // Spawn background scanning task
     std::thread::spawn(move || {
         let state = ScanState::new();
+
+        // Register the current scan state for cancellation
+        let global_state = CURRENT_SCAN_STATE.get_or_init(|| Arc::new(Mutex::new(None)));
+        if let Ok(mut current) = global_state.lock() {
+            *current = Some(state.clone());
+        }
+
         let root_path = Path::new(&path);
         
         // Get disk info for root directory scans
@@ -246,9 +268,29 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
             let limited_root = build_limited_depth_node(&root_node, MAX_DEPTH);
             send_final_batch(&on_batch, &state, limited_root, disk_info);
         }
+
+        // Clear the current scan state when done
+        if let Some(global_state) = CURRENT_SCAN_STATE.get() {
+            if let Ok(mut current) = global_state.lock() {
+                *current = None;
+            }
+        }
     });
 
     Ok(())
+}
+
+#[tauri::command]
+fn cancel_scan() -> Result<(), String> {
+    if let Some(global_state) = CURRENT_SCAN_STATE.get() {
+        if let Ok(current) = global_state.lock() {
+            if let Some(state) = &*current {
+                state.cancel();
+                return Ok(());
+            }
+        }
+    }
+    Err("No active scan to cancel".to_string())
 }
 
 fn send_final_batch(channel: &Channel<PartialScanResult>, state: &ScanState, root_node: FileNode, disk_info: Option<DiskInfo>) {
@@ -320,6 +362,11 @@ fn scan_directory_recursive(
     state: &ScanState,
     root_path: &Path,
 ) -> Result<FileNode, String> {
+    // Check if scan has been cancelled
+    if state.is_cancelled() {
+        return Err("Scan cancelled".to_string());
+    }
+
     let path_str = path.to_string_lossy().to_string();
     
     // Prevent scanning above the root path to avoid duplicate counting
@@ -505,7 +552,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![scan_directory_streaming])
+        .invoke_handler(tauri::generate_handler![scan_directory_streaming, cancel_scan])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

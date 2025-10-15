@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, X } from 'lucide-react'
 import { invoke, Channel } from '@tauri-apps/api/core'
 import { getFileTypeInfo } from '@/lib/fileTypeUtils'
 import { updateStats } from '@/lib/statsStorage'
@@ -99,6 +99,7 @@ function AnalyzeContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [scanProgress, setScanProgress] = useState<{ currentPath: string; filesScanned: number; scannedSize: number; estimatedTotal: number } | null>(null)
   const [diskInfo, setDiskInfo] = useState<{ totalSpace: number; availableSpace: number; usedSpace: number } | null>(null)
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
   // Use ref to track component state
   const scanningRef = useRef(false)
@@ -153,6 +154,35 @@ function AnalyzeContent() {
     setTooltip(null)
   }
 
+  const handleCancelScan = async () => {
+    try {
+      await invoke('cancel_scan')
+      setIsLoading(false)
+      setScanProgress(null)
+      router.back()
+    } catch (error) {
+      console.error('取消掃描失敗:', error)
+    }
+  }
+
+  // Mouse tracking for cursor glow effect
+  useEffect(() => {
+    let animationFrame: number
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (animationFrame) cancelAnimationFrame(animationFrame)
+      animationFrame = requestAnimationFrame(() => {
+        setMousePosition({ x: e.clientX, y: e.clientY })
+      })
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      if (animationFrame) cancelAnimationFrame(animationFrame)
+    }
+  }, [])
+
   // Sync hover states between chart and file list
   useEffect(() => {
     if (!svgRef.current) return
@@ -161,7 +191,7 @@ function AnalyzeContent() {
       elements.forEach(element => {
         const sectorId = element.getAttribute('data-sector-id')
         element.classList.remove('hovered', 'dimmed')
-        
+
         if (hoveredSectorId && sectorId === hoveredSectorId) {
           element.classList.add('hovered')
         } else if (hoveredSectorId) {
@@ -482,8 +512,29 @@ function AnalyzeContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl space-y-6">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 flex items-center justify-center relative overflow-hidden p-4">
+        {/* Background Tech Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-primary/5 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-24 h-24 bg-primary/5 rounded-full blur-2xl animate-pulse delay-1000"></div>
+        </div>
+
+        {/* Cursor Follow Glow */}
+        <div
+          className="fixed pointer-events-none z-10"
+          style={{
+            left: mousePosition.x - 150,
+            top: mousePosition.y - 150,
+            width: '300px',
+            height: '300px',
+            transform: 'translate3d(0, 0, 0)',
+            willChange: 'transform',
+          }}
+        >
+          <div className="w-full h-full bg-primary/8 rounded-full blur-3xl"></div>
+        </div>
+
+        <div className="w-full max-w-2xl space-y-6 relative z-20">
           <div className="text-center space-y-2">
             <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
             <p className="text-lg font-medium text-foreground">正在掃描資料夾</p>
@@ -491,7 +542,8 @@ function AnalyzeContent() {
           </div>
 
           {scanProgress && scanProgress.filesScanned > 0 && (
-            <div className="bg-card rounded-lg border border-border p-6 space-y-4">
+            <div className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-6 space-y-4 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:shadow-lg group relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               {/* Progress bar - only show if we have estimated total (disk root) */}
               {scanProgress.estimatedTotal > 0 && (
                 <div className="space-y-2">
@@ -513,7 +565,7 @@ function AnalyzeContent() {
               )}
 
               {/* Stats */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 relative z-10">
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">已掃描項目</p>
                   <p className="text-2xl font-bold text-foreground font-mono">
@@ -529,11 +581,24 @@ function AnalyzeContent() {
               </div>
 
               {/* Current path */}
-              <div className="pt-4 border-t border-border">
+              <div className="pt-4 border-t border-border relative z-10">
                 <p className="text-xs text-muted-foreground mb-1">當前路徑</p>
-                <p className="text-sm text-foreground font-mono truncate" title={scanProgress.currentPath}>
+                <p className="text-sm text-foreground font-mono break-all" title={scanProgress.currentPath}>
                   {scanProgress.currentPath}
                 </p>
+              </div>
+
+              {/* Cancel button */}
+              <div className="pt-4 border-t border-border relative z-10 flex justify-center">
+                <button
+                  onClick={handleCancelScan}
+                  className="bg-gradient-to-br from-destructive/20 to-destructive/10 backdrop-blur-md rounded-lg border-2 border-destructive/50 px-4 py-2 flex items-center gap-2 hover:from-destructive/30 hover:to-destructive/15 hover:border-destructive/70 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-destructive/20 group relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-destructive/10 via-destructive/20 to-destructive/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="absolute -inset-1 bg-gradient-to-r from-destructive/30 to-destructive/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <X className="w-4 h-4 text-destructive relative z-10 group-hover:rotate-90 transition-transform duration-300" />
+                  <span className="text-sm font-semibold text-destructive relative z-10">取消掃描</span>
+                </button>
               </div>
             </div>
           )}
@@ -587,7 +652,28 @@ function AnalyzeContent() {
   }
 
   return (
-    <div className="w-[840px] h-[630px] bg-background overflow-hidden flex flex-col">
+    <div className="w-[840px] h-[630px] bg-gradient-to-br from-background via-background to-muted/10 overflow-hidden flex flex-col relative">
+      {/* Background Tech Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-primary/5 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-24 h-24 bg-primary/5 rounded-full blur-2xl animate-pulse delay-1000"></div>
+      </div>
+
+      {/* Cursor Follow Glow */}
+      <div
+        className="fixed pointer-events-none z-10"
+        style={{
+          left: mousePosition.x - 150,
+          top: mousePosition.y - 150,
+          width: '300px',
+          height: '300px',
+          transform: 'translate3d(0, 0, 0)',
+          willChange: 'transform',
+        }}
+      >
+        <div className="w-full h-full bg-primary/8 rounded-full blur-3xl"></div>
+      </div>
+
       <style jsx>{`
         @keyframes layerFadeIn {
           from {
@@ -627,7 +713,7 @@ function AnalyzeContent() {
         
       `}</style>
       {/* Header */}
-      <div className="flex items-center justify-between bg-card border-b border-border px-3 py-2 shadow-sm flex-shrink-0">
+      <div className="flex items-center justify-between bg-card/60 backdrop-blur-md border-b border-border/50 px-3 py-2 shadow-sm flex-shrink-0 relative z-20">
         <div className="flex items-center gap-2">
           <button
             onClick={() => router.back()}
@@ -641,7 +727,7 @@ function AnalyzeContent() {
       </div>
 
       {/* Breadcrumb Navigation */}
-      <div className="bg-card border-b border-border px-3 py-2 flex-shrink-0">
+      <div className="bg-card/60 backdrop-blur-md border-b border-border/50 px-3 py-2 flex-shrink-0 relative z-20">
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-muted-foreground font-medium">Path:</span>
           <div className="flex items-center gap-1 flex-1 min-w-0">
@@ -668,8 +754,8 @@ function AnalyzeContent() {
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-[1fr_260px] overflow-hidden">
-        <div className="bg-card border-r border-border p-3 flex flex-col overflow-hidden">
+      <div className="flex-1 grid grid-cols-[1fr_260px] overflow-hidden relative z-20">
+        <div className="bg-card/60 backdrop-blur-md border-r border-border/50 p-3 flex flex-col overflow-hidden">
           <div className="flex items-center justify-between mb-2 flex-shrink-0">
             <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
               <span className="w-0.5 h-3 bg-primary rounded-full"></span>
@@ -827,7 +913,7 @@ function AnalyzeContent() {
           )}
         </div>
 
-        <div className="bg-card p-3 flex flex-col overflow-hidden">
+        <div className="bg-card/60 backdrop-blur-md p-3 flex flex-col overflow-hidden">
           <h2 className="text-xs font-semibold mb-2 text-foreground flex items-center gap-1.5 flex-shrink-0">
             <span className="w-0.5 h-3 bg-primary rounded-full"></span>
             Files & Folders
@@ -844,26 +930,27 @@ function AnalyzeContent() {
               return (
               <div
                 key={item.path}
-                className="flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent file-item"
+                className="flex items-center justify-between p-2 rounded transition-all duration-300 cursor-pointer border border-transparent file-item hover:bg-card/80 hover:border-primary/20 hover:scale-[1.02] hover:shadow-md group relative overflow-hidden"
                 data-sector-id={sectorId}
                 onMouseEnter={(e) => handleHover(sectorId, e, fileTypeInfo.label, item.name, formatBytes(item.value), fileTypeInfo.icon, fileTypeInfo.color)}
                 onMouseMove={handleMouseMove}
                 onClick={() => handlePieClick(item)}
               >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded"></div>
+                <div className="flex items-center gap-2 flex-1 min-w-0 relative z-10">
                   <IconComponent
-                    className="w-5 h-5 flex-shrink-0"
+                    className="w-5 h-5 flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
                     style={{ color: fileTypeInfo.color }}
                   />
                   <div
-                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    className="w-2 h-2 rounded-full flex-shrink-0 transition-all duration-300 group-hover:scale-125 group-hover:shadow-lg"
                     style={{ backgroundColor: item.color }}
                   />
                   <span className="text-sm text-foreground truncate font-medium">
                     {item.name}
                   </span>
                 </div>
-                <div className="text-[10px] font-semibold text-muted-foreground ml-2 tabular-nums">
+                <div className="text-[10px] font-semibold text-muted-foreground ml-2 tabular-nums relative z-10">
                   {formatBytes(item.value)}
                 </div>
               </div>
@@ -884,8 +971,9 @@ function AnalyzeContent() {
             zIndex: 999999,
           }}
         >
-          <div className="bg-card border-2 border-primary/20 rounded-lg shadow-xl px-3 py-2 space-y-1">
-            <div className="flex items-center gap-2">
+          <div className="bg-card/90 backdrop-blur-md border-2 border-primary/30 rounded-lg shadow-2xl px-3 py-2 space-y-1 animate-in fade-in duration-200 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent rounded-lg"></div>
+            <div className="flex items-center gap-2 relative z-10">
               {tooltip.icon && (
                 <tooltip.icon
                   className="w-4 h-4 flex-shrink-0"
@@ -896,10 +984,10 @@ function AnalyzeContent() {
                 {tooltip.label}
               </div>
             </div>
-            <div className="text-sm font-medium text-foreground max-w-[200px] truncate">
+            <div className="text-sm font-medium text-foreground max-w-[200px] truncate relative z-10">
               {tooltip.content}
             </div>
-            <div className="text-xs font-mono text-muted-foreground">
+            <div className="text-xs font-mono text-muted-foreground relative z-10">
               {tooltip.size}
             </div>
           </div>
