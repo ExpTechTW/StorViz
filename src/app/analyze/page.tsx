@@ -581,27 +581,30 @@ function AnalyzeContent() {
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
               {/* Progress bar - only show for root directory scans */}
-              {scanProgress.estimatedTotal > 0 && (
-                <div className="space-y-2 relative z-10">
-                  <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-muted-foreground">掃描進度（預估）</span>
-                    <span className="font-mono text-primary font-semibold">
-                      {Math.min(100, Math.round((scanProgress.scannedSize / scanProgress.estimatedTotal) * 100))}%
-                    </span>
+              {scanProgress.estimatedTotal > 0 && (() => {
+                const percentage = Math.min(100, (scanProgress.scannedSize / scanProgress.estimatedTotal) * 100);
+                return (
+                  <div className="space-y-2 relative z-10">
+                    <div className="flex justify-between items-center text-sm mb-2">
+                      <span className="text-muted-foreground">掃描進度（預估）</span>
+                      <span className="font-mono text-primary font-semibold">
+                        {Math.round(percentage)}%
+                      </span>
+                    </div>
+                    <div style={{ width: '100%' }}>
+                      <progress
+                        value={Math.max(0, Math.min(100, percentage))}
+                        max={100}
+                        style={{ width: '100%', height: '12px' }}
+                        aria-label="掃描進度"
+                      />
+                    </div>
+                    {scanProgress.scannedSize > scanProgress.estimatedTotal && (
+                      <p className="text-xs text-muted-foreground">注意：實際大小可能因硬連結等因素超過預估</p>
+                    )}
                   </div>
-                  <div className="h-3 bg-muted rounded-full overflow-hidden w-full">
-                    <div
-                      className="h-full bg-primary transition-all duration-300 ease-out"
-                      style={{
-                        width: `${Math.min(100, (scanProgress.scannedSize / scanProgress.estimatedTotal) * 100)}%`
-                      }}
-                    />
-                  </div>
-                  {scanProgress.scannedSize > scanProgress.estimatedTotal && (
-                    <p className="text-xs text-muted-foreground">注意：實際大小可能因硬連結等因素超過預估</p>
-                  )}
-                </div>
-              )}
+                );
+              })()}
 
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 relative z-10">
