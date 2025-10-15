@@ -352,9 +352,13 @@ function AnalyzeContent() {
   const [scanProgress, setScanProgress] = useState<{ currentPath: string; filesScanned: number; scannedSize: number; estimatedTotal: number } | null>(null)
   const [diskInfo, setDiskInfo] = useState<{ totalSpace: number; availableSpace: number; usedSpace: number } | null>(null)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const [scanStartTime, setScanStartTime] = useState<number | null>(null)
+  const [scanElapsedTime, setScanElapsedTime] = useState<number>(0)
+  const [scanCompleteTime, setScanCompleteTime] = useState<number | null>(null)
 
   // Use ref to track component state
   const scanningRef = useRef(false)
+  const elapsedTimeIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Cache compact nodes from batches
   const compactNodesCache = useRef<any[]>([])
@@ -480,6 +484,17 @@ function AnalyzeContent() {
         setIsLoading(true)
         setScanProgress({ currentPath: path, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
 
+        // Start timer
+        const startTime = Date.now()
+        setScanStartTime(startTime)
+        setScanElapsedTime(0)
+        setScanCompleteTime(null)
+
+        // Update elapsed time every 100ms
+        elapsedTimeIntervalRef.current = setInterval(() => {
+          setScanElapsedTime(Date.now() - startTime)
+        }, 100)
+
         // Create channel for streaming batches
         const onBatch = new Channel<{
           nodes: FileNode[];
@@ -513,6 +528,16 @@ function AnalyzeContent() {
               return
             }
 
+            // Stop timer
+            if (elapsedTimeIntervalRef.current) {
+              clearInterval(elapsedTimeIntervalRef.current)
+              elapsedTimeIntervalRef.current = null
+            }
+
+            // Record completion time
+            const completionTime = Date.now() - (scanStartTime || Date.now())
+            setScanCompleteTime(completionTime)
+
             // Rebuild tree from cached compact nodes
             const finalTree = rebuildTreeFromCompactNodes(message.root_node, compactNodesCache.current)
 
@@ -525,14 +550,17 @@ function AnalyzeContent() {
               usedSpace: message.disk_info.used_space
             } : null)
 
-            setIsLoading(false)
-            setScanProgress(null)
-
             // 更新累計統計數據
             updateStats(message.total_scanned, message.total_size)
 
             // Clear cache
             compactNodesCache.current = []
+
+            // Wait 3 seconds before hiding loading screen
+            setTimeout(() => {
+              setIsLoading(false)
+              setScanProgress(null)
+            }, 3000)
           }
         }
 
@@ -542,6 +570,11 @@ function AnalyzeContent() {
         console.error('Scan failed:', error)
         setIsLoading(false)
         setScanProgress(null)
+        // Stop timer on error
+        if (elapsedTimeIntervalRef.current) {
+          clearInterval(elapsedTimeIntervalRef.current)
+          elapsedTimeIntervalRef.current = null
+        }
       } finally {
         scanningRef.current = false
       }
@@ -549,6 +582,40 @@ function AnalyzeContent() {
 
     scanFolder()
   }, [path])
+
+  // Format time in seconds
+  const formatTime = (ms: number): string => {
+    const seconds = Math.floor(ms / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+
+    if (hours > 0) {
+      return `${hours}:${String(minutes % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+    } else if (minutes > 0) {
+      return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
+    } else {
+      return `${seconds}s`
+    }
+  }
+
+  // Calculate estimated remaining time based on progress
+  const calculateRemainingTime = (): string | null => {
+    if (!scanProgress || !scanStartTime || scanProgress.estimatedTotal === 0 || scanProgress.scannedSize === 0) {
+      return null
+    }
+
+    const elapsed = scanElapsedTime
+    const progress = scanProgress.scannedSize / scanProgress.estimatedTotal
+
+    if (progress <= 0) return null
+
+    const estimatedTotal = elapsed / progress
+    const remaining = estimatedTotal - elapsed
+
+    if (remaining < 0) return null
+
+    return formatTime(remaining)
+  }
 
   // Helper functions must be defined before use
   const prepareMultiLayerData = (rootNode: FileNode | null, maxDepth: number = 10): LayerData[] => {
@@ -964,6 +1031,35 @@ function AnalyzeContent() {
                     {formatBytes(scanProgress.scannedSize)}
                   </p>
                 </div>
+              </div>
+
+              {/* Time stats */}
+              <div className="grid grid-cols-2 gap-4 relative z-10 pt-2 border-t border-border/50">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">已耗時</p>
+                  <p className="text-xl font-bold text-primary font-mono">
+                    {scanCompleteTime ? formatTime(scanCompleteTime) : formatTime(scanElapsedTime)}
+                  </p>
+                </div>
+                {!scanCompleteTime && (() => {
+                  const remainingTime = calculateRemainingTime()
+                  return remainingTime ? (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">預估剩餘</p>
+                      <p className="text-xl font-bold text-primary font-mono">
+                        {remainingTime}
+                      </p>
+                    </div>
+                  ) : null
+                })()}
+                {scanCompleteTime && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400">✓ 掃描完成</p>
+                    <p className="text-sm text-muted-foreground">
+                      即將進入分析...
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Current path */}
