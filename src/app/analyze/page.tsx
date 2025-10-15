@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { invoke, Channel } from '@tauri-apps/api/core'
 
 interface FileNode {
   name: string
@@ -139,53 +138,85 @@ function AnalyzeContent() {
   const [scanProgress, setScanProgress] = useState<{ currentPath: string; filesScanned: number; scannedSize: number; estimatedTotal: number } | null>(null)
   const [diskInfo, setDiskInfo] = useState<{ totalSpace: number; availableSpace: number; usedSpace: number } | null>(null)
 
+  // Use ref to track component state
+  const scanningRef = useRef(false)
+
   useEffect(() => {
-    if (!path) return
+    if (!path) {
+      console.log('❌ analyze 頁面: 沒有 path 參數')
+      return
+    }
 
-    // Generate event ID using seconds timestamp
-    const eventId = Math.floor(Date.now() / 1000).toString()
+    // Prevent duplicate scans
+    if (scanningRef.current) {
+      console.log('⏭️ 掃描已在進行中，跳過')
+      return
+    }
 
-    let unlistenFn: (() => void) | null = null
+    console.log('✅ analyze 頁面載入，path:', path)
 
     const scanFolder = async () => {
       try {
+        scanningRef.current = true
+        console.log('📂 開始掃描流程...')
         setIsLoading(true)
         setScanProgress({ currentPath: path, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
 
-        const unlisten = await listen<{ current_path: string; files_scanned: number; scanned_size: number; estimated_total: number }>('scan-progress', (event) => {
+        console.log('👂 設置批次監聽器 (使用 Channel)...')
+
+        // Create channel for streaming batches
+        const onBatch = new Channel<{ nodes: FileNode[]; total_scanned: number; total_size: number; is_complete: boolean; root_node?: FileNode }>()
+        onBatch.onmessage = (message) => {
+          console.log('📦 收到批次訊息!')
+          console.log('📦 收到批次:', message.total_scanned, '個項目，總大小:', (message.total_size / (1024 * 1024 * 1024)).toFixed(2), 'GB')
+          console.log('📦 is_complete:', message.is_complete)
+
+          // Update progress
           setScanProgress({
-            currentPath: event.payload.current_path,
-            filesScanned: event.payload.files_scanned,
-            scannedSize: event.payload.scanned_size,
-            estimatedTotal: event.payload.estimated_total
+            currentPath: path,
+            filesScanned: message.total_scanned,
+            scannedSize: message.total_size,
+            estimatedTotal: 0
           })
-        })
-        unlistenFn = unlisten
 
-        const result = await invoke<{ node: FileNode; diskInfo?: { totalSpace: number; availableSpace: number; usedSpace: number } }>('scan_directory', { path, eventId })
+          // If complete, use root_node from the message
+          if (message.is_complete && message.root_node) {
+            console.log('✅ 流式掃描完成！設置顯示資料...')
+            setData(message.root_node)
+            setCurrentLevel(message.root_node)
+            setBreadcrumb([message.root_node])
+            setDiskInfo(null)
+            setIsLoading(false)
+            setScanProgress(null)
+            console.log('🎉 顯示資料設置完成')
+          }
+        }
+        console.log('✅ Channel 設置完成')
 
-        setData(result.node)
-        setCurrentLevel(result.node)
-        setBreadcrumb([result.node])
-        setDiskInfo(result.diskInfo || null)
+        // Start streaming scan (returns immediately, scanning in background)
+        console.log('🚀 啟動流式掃描，path:', path)
+        await invoke('scan_directory_streaming', { path, onBatch })
+        console.log('✅ 背景掃描已啟動')
+
+        // Data will be set when scan completes (via event listener)
+      } catch (error) {
+        console.error('❌ 掃描失敗:', error)
+        console.error('錯誤詳情:', JSON.stringify(error))
         setIsLoading(false)
         setScanProgress(null)
-      } catch (error) {
         // Backend handles deduplication, silently ignore duplicate scan errors
       } finally {
-        if (unlistenFn) {
-          unlistenFn()
-        }
+        scanningRef.current = false
       }
     }
 
+    // Start scanning immediately
+    console.log('⏰ 準備開始掃描...')
     scanFolder()
 
-    // Cleanup function - only unlisten, don't cancel state updates
+    // Cleanup function
     return () => {
-      if (unlistenFn) {
-        unlistenFn()
-      }
+      console.log('🧹 清理 useEffect')
     }
   }, [path])
 

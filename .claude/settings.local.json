@@ -10,7 +10,8 @@
       "Bash(tree:*)",
       "Bash(cat:*)",
       "Bash(cargo:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(npm run tauri:*)"
     ],
     "deny": [],
     "ask": []

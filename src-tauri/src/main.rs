@@ -1,21 +1,13 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// Modified to trigger recompile
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tauri::Emitter;
-use sysinfo::Disks;
-
-// Global map to track recent event IDs (path -> Vec<event_id>)
-// Keep only the last 5 event IDs for each path
-lazy_static::lazy_static! {
-    static ref RECENT_EVENTS: Mutex<HashMap<String, Vec<String>>> = Mutex::new(HashMap::new());
-}
-
-const MAX_EVENT_IDS: usize = 5; // Keep last 5 event IDs
+use tauri::ipc::Channel;
+use rayon::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FileNode {
@@ -28,110 +20,154 @@ struct FileNode {
 }
 
 #[derive(Clone, Serialize)]
-struct ScanResult {
-    node: FileNode,
-    #[serde(rename = "diskInfo")]
-    disk_info: Option<DiskInfo>,
-}
-
-#[derive(Clone, Serialize)]
-struct ScanProgress {
-    current_path: String,
-    files_scanned: u64,
-    scanned_size: u64,
-    estimated_total: u64,
-}
-
-#[derive(Clone, Serialize)]
-struct DiskInfo {
-    #[serde(rename = "totalSpace")]
-    total_space: u64,
-    #[serde(rename = "availableSpace")]
-    available_space: u64,
-    #[serde(rename = "usedSpace")]
-    used_space: u64,
+struct PartialScanResult {
+    nodes: Vec<FileNode>,
+    total_scanned: u64,
+    total_size: u64,
+    is_complete: bool,
+    root_node: Option<FileNode>,
 }
 
 #[tauri::command]
-fn scan_directory(path: String, event_id: String, app_handle: tauri::AppHandle) -> Result<ScanResult, String> {
-    // Check for duplicate event ID
-    {
-        let mut recent_events = RECENT_EVENTS.lock().unwrap();
-
-        if let Some(event_ids) = recent_events.get(&path) {
-            if event_ids.contains(&event_id) {
-                return Err("重複的掃描請求".to_string());
-            }
-        }
-
-        // Add current event ID and keep only last MAX_EVENT_IDS
-        let event_ids = recent_events.entry(path.clone()).or_insert_with(Vec::new);
-        event_ids.push(event_id);
-        if event_ids.len() > MAX_EVENT_IDS {
-            event_ids.drain(0..(event_ids.len() - MAX_EVENT_IDS));
-        }
-    }
+async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanResult>) -> Result<(), String> {
+    println!("🔍 開始流式掃描目錄: {}", path);
 
     let root_path = Path::new(&path);
 
     if !root_path.exists() {
+        println!("❌ 路徑不存在: {}", root_path.display());
         return Err("路徑不存在".to_string());
     }
 
-    // Try to get disk information for the drive (only if scanning root)
-    let estimated_total = Arc::new(Mutex::new(0u64));
-    let disks = Disks::new_with_refreshed_list();
+    println!("🚀 開始完整掃描（流式傳輸）...");
 
-    // Check if this is a disk root (like D:\, C:\, etc.)
-    let is_disk_root = root_path.parent().is_none() || root_path.to_string_lossy().ends_with(":\\");
-    let mut disk_info_result: Option<DiskInfo> = None;
+    // Clone variables for the background task
+    let path_clone = path.clone();
 
-    if is_disk_root {
-        // Find the disk that matches this path
-        for disk in &disks {
-            let mount_point = disk.mount_point();
-            if root_path == mount_point {
-                // Use disk total space - available space as the estimated total
-                let total_space = disk.total_space();
-                let available_space = disk.available_space();
-                let used_space = total_space.saturating_sub(available_space);
-                *estimated_total.lock().unwrap() = used_space;
+    // Spawn blocking task in a separate thread to avoid blocking the event loop
+    std::thread::spawn(move || {
+        println!("🧵 掃描線程已啟動");
+        let root_path = Path::new(&path_clone);
+        let counter = Arc::new(Mutex::new(0u64));
+        let scanned_size = Arc::new(Mutex::new(0u64));
+        let batch_buffer = Arc::new(Mutex::new(Vec::new()));
+        let batch_size = 10000;
 
-                disk_info_result = Some(DiskInfo {
-                    total_space,
-                    available_space,
-                    used_space,
-                });
+        // Scan recursively and send batches via channel
+        if let Ok(root_node) = scan_dir_streaming_channel(
+            root_path,
+            &on_batch,
+            counter.clone(),
+            scanned_size.clone(),
+            batch_buffer.clone(),
+            batch_size
+        ) {
+            // Build limited depth root node (10 levels for visualization)
+            let limited_root = build_limited_depth_node(&root_node, 10);
 
-                let _ = app_handle.emit("scan-progress", ScanProgress {
-                    current_path: format!("磁碟: {} (總計: {} GB)", mount_point.display(), total_space / (1024 * 1024 * 1024)),
-                    files_scanned: 0,
-                    scanned_size: 0,
-                    estimated_total: used_space,
-                });
-                break;
+            // Send final batch if there are remaining items
+            {
+                let mut buffer = batch_buffer.lock().unwrap();
+                let total_items = *counter.lock().unwrap();
+                let total_size = *scanned_size.lock().unwrap();
+
+                if !buffer.is_empty() {
+                    println!("📤 發送最後一批: {} 個項目", buffer.len());
+                    let payload = PartialScanResult {
+                        nodes: buffer.clone(),
+                        total_scanned: total_items,
+                        total_size,
+                        is_complete: true,
+                        root_node: Some(limited_root.clone()),
+                    };
+
+                    // Send via channel
+                    match on_batch.send(payload) {
+                        Ok(_) => println!("✅ 最後一批事件發送成功"),
+                        Err(e) => println!("❌ 最後一批事件發送失敗: {:?}", e),
+                    }
+                    buffer.clear();
+                } else {
+                    // Send completion message with root node even if buffer is empty
+                    println!("📤 發送完成訊息（包含根節點）");
+                    let payload = PartialScanResult {
+                        nodes: Vec::new(),
+                        total_scanned: total_items,
+                        total_size,
+                        is_complete: true,
+                        root_node: Some(limited_root),
+                    };
+
+                    match on_batch.send(payload) {
+                        Ok(_) => println!("✅ 完成訊息發送成功"),
+                        Err(e) => println!("❌ 完成訊息發送失敗: {:?}", e),
+                    }
+                }
             }
+
+            let total_items = *counter.lock().unwrap();
+            let total_size = *scanned_size.lock().unwrap();
+            println!("✅ 掃描完成！");
+            println!("📊 統計資訊:");
+            println!("   - 掃描項目: {} 個", total_items);
+            println!("   - 總大小: {} bytes ({:.2} GB)", total_size, total_size as f64 / (1024.0 * 1024.0 * 1024.0));
         }
-    }
-    // For folders, don't estimate - just scan directly without pre-scan
+        println!("🧵 掃描線程已結束");
+    });
 
-    let counter = Arc::new(Mutex::new(0u64));
-    let scanned_size = Arc::new(Mutex::new(0u64));
-
-    let node = scan_dir_recursive(root_path, &app_handle, counter, scanned_size, estimated_total)?;
-
-    Ok(ScanResult {
-        node,
-        disk_info: disk_info_result,
-    })
+    // Return immediately, scanning happens in background
+    println!("✅ 背景掃描已啟動");
+    Ok(())
 }
 
-fn scan_dir_recursive(
+fn build_limited_depth_node(node: &FileNode, max_depth: usize) -> FileNode {
+    build_limited_depth_node_recursive(node, 0, max_depth)
+}
+
+fn build_limited_depth_node_recursive(node: &FileNode, current_depth: usize, max_depth: usize) -> FileNode {
+    // If we've reached max depth, return node without children
+    if current_depth >= max_depth {
+        return FileNode {
+            name: node.name.clone(),
+            size: node.size,
+            path: node.path.clone(),
+            children: if node.is_directory {
+                Some(Vec::new()) // Empty array indicates "more content available"
+            } else {
+                None
+            },
+            is_directory: node.is_directory,
+        };
+    }
+
+    // Otherwise, recursively process children
+    let limited_children = if let Some(children) = &node.children {
+        Some(
+            children
+                .iter()
+                .map(|child| build_limited_depth_node_recursive(child, current_depth + 1, max_depth))
+                .collect()
+        )
+    } else {
+        None
+    };
+
+    FileNode {
+        name: node.name.clone(),
+        size: node.size,
+        path: node.path.clone(),
+        children: limited_children,
+        is_directory: node.is_directory,
+    }
+}
+
+fn scan_dir_streaming_channel(
     path: &Path,
-    app_handle: &tauri::AppHandle,
+    channel: &Channel<PartialScanResult>,
     counter: Arc<Mutex<u64>>,
     scanned_size: Arc<Mutex<u64>>,
-    estimated_total: Arc<Mutex<u64>>
+    batch_buffer: Arc<Mutex<Vec<FileNode>>>,
+    batch_size: usize,
 ) -> Result<FileNode, String> {
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
     let name = path
@@ -141,61 +177,95 @@ fn scan_dir_recursive(
         .to_string();
     let path_str = path.to_string_lossy().to_string();
 
-    // Update progress counter
+    // Update counter
     {
         let mut count = counter.lock().unwrap();
         *count += 1;
-
-        // Emit progress event every 10 files or directories for more frequent updates
-        if *count % 10 == 0 {
-            let size = scanned_size.lock().unwrap();
-            let total = estimated_total.lock().unwrap();
-            let _ = app_handle.emit("scan-progress", ScanProgress {
-                current_path: path_str.clone(),
-                files_scanned: *count,
-                scanned_size: *size,
-                estimated_total: *total,
-            });
-        }
     }
 
     if metadata.is_file() {
         let file_size = metadata.len();
-        // Add file size to total
         {
             let mut size = scanned_size.lock().unwrap();
             *size += file_size;
         }
 
-        return Ok(FileNode {
+        let node = FileNode {
             name,
             size: file_size,
             path: path_str,
             children: None,
             is_directory: false,
-        });
-    }
+        };
 
-    // 掃描目錄
-    let mut children = Vec::new();
-    let mut dir_total_size = 0u64;
+        // Add to batch buffer
+        {
+            let mut buffer = batch_buffer.lock().unwrap();
+            buffer.push(node.clone());
 
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            if let Ok(child_node) = scan_dir_recursive(&entry.path(), app_handle, counter.clone(), scanned_size.clone(), estimated_total.clone()) {
-                dir_total_size += child_node.size;
-                children.push(child_node);
+            // Send batch if buffer is full
+            if buffer.len() >= batch_size {
+                let total_items = *counter.lock().unwrap();
+                let total_size = *scanned_size.lock().unwrap();
+
+                println!("📤 發送一批: {} 個項目 (總計: {} 個)", buffer.len(), total_items);
+                let payload = PartialScanResult {
+                    nodes: buffer.clone(),
+                    total_scanned: total_items,
+                    total_size,
+                    is_complete: false,
+                    root_node: None,
+                };
+
+                // Send via channel
+                match channel.send(payload) {
+                    Ok(_) => println!("✅ 批次發送成功"),
+                    Err(e) => println!("❌ 批次發送失敗: {:?}", e),
+                }
+                buffer.clear();
             }
         }
+
+        return Ok(node);
     }
 
-    Ok(FileNode {
-        name,
-        size: dir_total_size,
-        path: path_str,
-        children: Some(children),
-        is_directory: true,
-    })
+    // 掃描目錄 - 使用並行處理加速
+    if let Ok(entries) = fs::read_dir(path) {
+        let entries_vec: Vec<_> = entries.flatten().collect();
+
+        // 使用 rayon 並行處理子項目
+        let children: Vec<FileNode> = entries_vec
+            .par_iter()
+            .filter_map(|entry| {
+                scan_dir_streaming_channel(
+                    &entry.path(),
+                    channel,
+                    counter.clone(),
+                    scanned_size.clone(),
+                    batch_buffer.clone(),
+                    batch_size
+                ).ok()
+            })
+            .collect();
+
+        let dir_total_size: u64 = children.iter().map(|c| c.size).sum();
+
+        Ok(FileNode {
+            name,
+            size: dir_total_size,
+            path: path_str,
+            children: Some(children),
+            is_directory: true,
+        })
+    } else {
+        Ok(FileNode {
+            name,
+            size: 0,
+            path: path_str,
+            children: Some(Vec::new()),
+            is_directory: true,
+        })
+    }
 }
 
 fn main() {
@@ -203,7 +273,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![scan_directory])
+        .invoke_handler(tauri::generate_handler![scan_directory_streaming])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
