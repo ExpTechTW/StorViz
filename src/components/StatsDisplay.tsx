@@ -29,7 +29,7 @@ function StatCard({ icon, label, value, unit, formatValue, color }: StatCardProp
         </div>
       </div>
 
-      <div className="flex-1 min-w-0 relative z-10">
+      <div className="relative z-10">
         <h3 className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider mb-1">{label}</h3>
         <div className="flex items-center gap-1.5">
           <p

@@ -133,12 +133,12 @@ export default function HomePage() {
         {/* Statistics & Features */}
         <div className="space-y-3 w-full max-w-4xl mx-auto px-4">
           {/* Statistics - Row 1 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 200px)', gap: '12px', justifyContent: 'center' }}>
             <StatsDisplay />
           </div>
 
           {/* Features - Row 2 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 200px)', gap: '12px', justifyContent: 'center' }}>
             {features.map((feature, index) => (
               <FeatureCard
                 key={index}
