@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
+    "@tanstack/react-virtual": "^3.13.12",
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-dialog": "^2.4.0",
     "@tauri-apps/plugin-shell": "^2.3.1",

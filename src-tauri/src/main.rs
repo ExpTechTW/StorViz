@@ -78,7 +78,6 @@ struct ScanState {
     cancelled: Arc<AtomicBool>,
     current_path: Arc<Mutex<String>>,
     path_update_counter: Arc<Mutex<usize>>,
-    disk_info: Arc<Mutex<Option<DiskInfo>>>,
 }
 
 impl ScanState {
@@ -93,7 +92,6 @@ impl ScanState {
             cancelled: Arc::new(AtomicBool::new(false)),
             current_path: Arc::new(Mutex::new(String::new())),
             path_update_counter: Arc::new(Mutex::new(0)),
-            disk_info: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -205,19 +203,6 @@ impl ScanState {
         false
     }
 
-    fn set_disk_info(&self, info: Option<DiskInfo>) {
-        if let Ok(mut disk_info) = self.disk_info.lock() {
-            *disk_info = info;
-        }
-    }
-
-    fn get_disk_info(&self) -> Option<DiskInfo> {
-        if let Ok(disk_info) = self.disk_info.lock() {
-            disk_info.clone()
-        } else {
-            None
-        }
-    }
 }
 
 // Get disk space information using sysinfo
@@ -570,7 +555,6 @@ fn send_compact_batch(channel: &Channel<PartialScanResult>, state: &ScanState) {
     let (total_items, total_size) = state.get_stats();
     let compact_nodes = state.clear_compact_buffer();
     let current_path = state.get_current_path();
-    let disk_info = state.get_disk_info();
 
     println!("[RUST DEBUG] Sending batch with {} compact nodes", compact_nodes.len());
 
@@ -592,7 +576,6 @@ fn send_compact_batch(channel: &Channel<PartialScanResult>, state: &ScanState) {
 fn send_path_update(channel: &Channel<PartialScanResult>, state: &ScanState) {
     let (total_items, total_size) = state.get_stats();
     let current_path = state.get_current_path();
-    let disk_info = state.get_disk_info();
 
     let payload = PartialScanResult {
         nodes: Vec::new(),

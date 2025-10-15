@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2, X } from 'lucide-react'
 import { invoke, Channel } from '@tauri-apps/api/core'
 import { getFileTypeInfo } from '@/lib/fileTypeUtils'
 import { updateStats } from '@/lib/statsStorage'
+import { useVirtualizer } from '@tanstack/react-virtual'
 
 interface FileNode {
   name: string
@@ -364,6 +365,7 @@ function AnalyzeContent() {
 
   // Hover handlers with smart positioning
   const tooltipRef = useRef<HTMLDivElement>(null)
+  const listContainerRef = useRef<HTMLDivElement>(null)
 
   const calculateTooltipPosition = (mouseX: number, mouseY: number) => {
     const offsetX = 8
@@ -520,7 +522,7 @@ function AnalyzeContent() {
             currentPath: message.current_path || path,
             filesScanned: message.total_scanned,
             scannedSize: message.total_size,
-            estimatedTotal
+            estimatedTotal: 0 // Will be updated when disk_info is available
           })
 
           console.log('[DEBUG] Progress state updated')
@@ -869,6 +871,14 @@ function AnalyzeContent() {
   // Prepare data (must be before conditional returns)
   const layers = prepareMultiLayerData(currentLevel)
   const listData = prepareListData(currentLevel)
+
+  // Virtual list using TanStack Virtual
+  const rowVirtualizer = useVirtualizer({
+    count: listData.length,
+    getScrollElement: () => listContainerRef.current,
+    estimateSize: () => 52,
+    overscan: 5,
+  })
 
   // Helper function to find a node's parent chain from root
   const findNodePath = (root: FileNode, targetPath: string): FileNode[] | null => {
@@ -1361,44 +1371,64 @@ function AnalyzeContent() {
             Files & Folders ({listData.length})
           </h2>
           <div
-            className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-0.5 file-list"
+            ref={listContainerRef}
+            className="flex-1 file-list overflow-y-auto custom-scrollbar"
             onMouseLeave={handleLeave}
           >
-            {listData.map((item) => {
-              // If this is a tiny node merged into "其他", use __others__ as sectorId
-              const sectorId = item.isTinyNode ? generateSectorId('__others__', 0) : generateSectorId(item.path, 0)
-              const fileTypeInfo = getFileTypeInfo(item.name, item.node.isDirectory)
-              const IconComponent = fileTypeInfo.icon
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const item = listData[virtualRow.index]
+                const sectorId = item.isTinyNode ? generateSectorId('__others__', 0) : generateSectorId(item.path, 0)
+                const fileTypeInfo = getFileTypeInfo(item.name, item.node.isDirectory)
+                const IconComponent = fileTypeInfo.icon
 
-              return (
-              <div
-                key={item.path}
-                className="flex items-center justify-between p-2 rounded transition-all duration-300 cursor-pointer border border-transparent file-item hover:bg-card/80 hover:border-primary/20 hover:scale-[1.02] hover:shadow-md group relative overflow-hidden"
-                data-sector-id={sectorId}
-                onMouseEnter={(e) => handleHover(sectorId, e, fileTypeInfo.label, item.name, formatBytes(item.value), fileTypeInfo.icon, fileTypeInfo.color)}
-                onMouseMove={handleMouseMove}
-                onClick={() => handlePieClick(item)}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded"></div>
-                <div className="flex items-center gap-2 flex-1 min-w-0 relative z-10">
-                  <IconComponent
-                    className="w-5 h-5 flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
-                    style={{ color: fileTypeInfo.color }}
-                  />
+                return (
                   <div
-                    className="w-2 h-2 rounded-full flex-shrink-0 transition-all duration-300 group-hover:scale-125 group-hover:shadow-lg"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span className="text-sm text-foreground truncate font-medium">
-                    {item.name}
-                  </span>
-                </div>
-                <div className="text-[10px] font-semibold text-muted-foreground ml-2 tabular-nums relative z-10">
-                  {formatBytes(item.value)}
-                </div>
-              </div>
-              )
-            })}
+                    key={virtualRow.key}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <div
+                      className="flex items-center justify-between p-2 rounded transition-all duration-300 cursor-pointer border border-transparent file-item hover:bg-card/80 hover:border-primary/20 hover:scale-[1.02] hover:shadow-md group relative overflow-hidden mx-1"
+                      data-sector-id={sectorId}
+                      onMouseEnter={(e) => handleHover(sectorId, e, fileTypeInfo.label, item.name, formatBytes(item.value), fileTypeInfo.icon, fileTypeInfo.color)}
+                      onMouseMove={handleMouseMove}
+                      onClick={() => handlePieClick(item)}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <div className="flex items-center gap-2 flex-1 min-w-0 relative z-10">
+                        <IconComponent
+                          className="w-4 h-4 flex-shrink-0"
+                          style={{ color: fileTypeInfo.color }}
+                        />
+                        <span className="text-xs font-medium truncate">{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 relative z-10">
+                        <span className="text-[10px] font-mono text-muted-foreground">
+                          {formatBytes(item.value)}
+                        </span>
+                        <div
+                          className="w-3 h-3 rounded-sm flex-shrink-0"
+                          style={{ backgroundColor: item.color }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>
