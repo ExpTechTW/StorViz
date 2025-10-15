@@ -369,26 +369,23 @@ fn scan_directory_recursive(
     
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
     
-    // Get inode number for this file/directory
-    #[cfg(unix)]
-    let inode = metadata.ino();
-    #[cfg(not(unix))]
-    let inode = 0;
-    
     // Check if we've already visited this inode (prevents symlink loops and hard link duplicates)
-    if state.is_visited_inode(inode) {
-        println!("DEBUG: Skipping already visited inode: {} ({})", inode, path_str);
-        return Ok(FileNode {
-            name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
-            size: 0,
-            path: path_str,
-            children: None,
-            is_directory: false,
-        });
+    // Only use inode tracking on Unix systems
+    #[cfg(unix)]
+    {
+        let inode = metadata.ino();
+        if state.is_visited_inode(inode) {
+            println!("DEBUG: Skipping already visited inode: {} ({})", inode, path_str);
+            return Ok(FileNode {
+                name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
+                size: 0,
+                path: path_str,
+                children: None,
+                is_directory: false,
+            });
+        }
+        state.mark_visited_inode(inode);
     }
-    
-    // Mark this inode as visited
-    state.mark_visited_inode(inode);
     
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
     state.increment_counter();
