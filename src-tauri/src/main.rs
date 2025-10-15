@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use tauri::ipc::Channel;
 use rayon::prelude::*;
 use sysinfo::Disks;
+use std::os::unix::fs::MetadataExt;
 
 // Constants
 const BATCH_SIZE: usize = 10000;
@@ -47,7 +48,7 @@ struct ScanState {
     counter: Arc<Mutex<u64>>,
     scanned_size: Arc<Mutex<u64>>,
     batch_buffer: Arc<Mutex<Vec<FileNode>>>,
-    visited_paths: Arc<Mutex<HashSet<String>>>,
+    visited_inodes: Arc<Mutex<HashSet<u64>>>,
 }
 
 impl ScanState {
@@ -56,7 +57,7 @@ impl ScanState {
             counter: Arc::new(Mutex::new(0)),
             scanned_size: Arc::new(Mutex::new(0)),
             batch_buffer: Arc::new(Mutex::new(Vec::new())),
-            visited_paths: Arc::new(Mutex::new(HashSet::new())),
+            visited_inodes: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -95,17 +96,19 @@ impl ScanState {
         }
     }
 
-    fn is_visited(&self, path: &str) -> bool {
-        if let Ok(visited) = self.visited_paths.lock() {
-            visited.contains(path)
+    fn is_visited_inode(&self, inode: u64) -> bool {
+        if let Ok(visited) = self.visited_inodes.lock() {
+            visited.contains(&inode)
         } else {
             false
         }
     }
 
-    fn mark_visited(&self, path: &str) {
-        if let Ok(mut visited) = self.visited_paths.lock() {
-            visited.insert(path.to_string());
+    fn mark_visited_inode(&self, inode: u64) -> bool {
+        if let Ok(mut visited) = self.visited_inodes.lock() {
+            visited.insert(inode)
+        } else {
+            false
         }
     }
 }
@@ -124,8 +127,10 @@ fn get_disk_info(path: &Path) -> Option<DiskInfo> {
     for disk in disks.list() {
         let disk_path = disk.mount_point().to_string_lossy();
         
-        // Debug output to see what we're comparing
-        println!("DEBUG: Comparing path '{}' with disk mount point '{}'", path_str, disk_path);
+        // Only log when we find a match to reduce noise
+        if path_str.starts_with(&*disk_path) {
+            println!("DEBUG: Found matching disk '{}' for path '{}'", disk_path, path_str);
+        }
         
         // Check if the path is on this disk
         if path_str.starts_with(&*disk_path) {
@@ -303,8 +308,17 @@ fn scan_directory_recursive(
 ) -> Result<FileNode, String> {
     let path_str = path.to_string_lossy().to_string();
     
-    // Check if we've already visited this path (prevents symlink loops)
-    if state.is_visited(&path_str) {
+    let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
+    
+    // Get inode number for this file/directory
+    #[cfg(unix)]
+    let inode = metadata.ino();
+    #[cfg(not(unix))]
+    let inode = 0;
+    
+    // Check if we've already visited this inode (prevents symlink loops and hard link duplicates)
+    if state.is_visited_inode(inode) {
+        println!("DEBUG: Skipping already visited inode: {} ({})", inode, path_str);
         return Ok(FileNode {
             name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
             size: 0,
@@ -314,16 +328,15 @@ fn scan_directory_recursive(
         });
     }
     
-    // Mark as visited
-    state.mark_visited(&path_str);
+    // Mark this inode as visited
+    state.mark_visited_inode(inode);
     
-    let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-
     state.increment_counter();
 
     // Skip symlinks entirely - they are virtual references and shouldn't be counted
     if metadata.file_type().is_symlink() {
+        println!("DEBUG: Skipping symlink: {}", path_str);
         // Return a minimal node with size 0, but don't add to buffer to avoid cluttering
         return Ok(FileNode {
             name,
@@ -336,6 +349,23 @@ fn scan_directory_recursive(
 
     if metadata.is_file() {
         let file_size = metadata.len();
+        
+        // Safety check: skip files larger than 1GB (might be virtual files or errors)
+        if file_size > 1_000_000_000 {
+            println!("DEBUG: Skipping large file '{}' size: {} bytes (>{})", name, file_size, 1_000_000_000);
+            return Ok(FileNode {
+                name,
+                size: 0,
+                path: path_str,
+                children: None,
+                is_directory: false,
+            });
+        }
+        
+        // Only log large files (>10MB) to reduce noise
+        if file_size > 10_000_000 {
+            println!("DEBUG: Large file '{}' size: {} bytes", name, file_size);
+        }
         state.add_size(file_size);
 
         let node = FileNode {
@@ -392,8 +422,7 @@ fn scan_directory_recursive(
                     }
                 }
                 
-                // Skip if already visited (additional safety check)
-                !state.is_visited(&path_str)
+                true
             })
             .collect();
         
@@ -405,6 +434,12 @@ fn scan_directory_recursive(
             .collect();
 
         let dir_total_size: u64 = children.iter().map(|c| c.size).sum();
+        
+        // Only log large directories (>100MB) to reduce noise
+        if dir_total_size > 100_000_000 {
+            println!("DEBUG: Large directory '{}' total size: {} bytes ({} children)", 
+                     name, dir_total_size, children.len());
+        }
 
         Ok(FileNode {
             name,
