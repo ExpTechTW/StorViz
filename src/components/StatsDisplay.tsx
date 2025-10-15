@@ -19,27 +19,27 @@ function StatCard({ icon, label, value, unit, formatValue, color }: StatCardProp
   const displayValue = formatValue ? formatValue(animatedValue) : animatedValue.toLocaleString()
 
   return (
-    <div className="bg-card/50 backdrop-blur-sm rounded-md border border-border/40 p-2 flex items-center gap-2 hover:bg-card/70 transition-all duration-300 hover:scale-[1.02] group relative overflow-hidden">
-      {/* Background decoration - subtle glow on hover */}
-      <div className="absolute inset-0 bg-primary/5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+    <div className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg group relative overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
-      <div className="relative z-10 w-6 h-6 bg-primary/10 rounded-md flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-300 flex-shrink-0">
-        <div style={{ color }} className="transition-transform duration-300 group-hover:scale-110">
+      <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300 flex-shrink-0 shadow-sm">
+        <div style={{ color }} className="w-4 h-4 flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
           {icon}
         </div>
       </div>
 
       <div className="flex-1 min-w-0 relative z-10">
-        <h3 className="text-xs font-semibold text-foreground">{label}</h3>
-        <div className="flex items-baseline gap-1">
+        <h3 className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider mb-1">{label}</h3>
+        <div className="flex items-baseline gap-1.5">
           <p
-            className="text-sm font-bold tabular-nums leading-tight"
+            className="text-xl font-bold tabular-nums leading-none"
             style={{ color }}
           >
             {displayValue}
           </p>
           {unit && (
-            <p className="text-[10px] text-muted-foreground font-medium">{unit}</p>
+            <p className="text-xs font-semibold text-foreground">{unit}</p>
           )}
         </div>
       </div>

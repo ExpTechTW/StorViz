@@ -15,13 +15,18 @@ interface FeatureCardProps {
 
 function FeatureCard({ icon, title, description }: FeatureCardProps) {
   return (
-    <div className="bg-card/50 backdrop-blur-sm rounded-md border border-border/40 p-2 flex items-center gap-2 hover:bg-card/70 transition-all duration-300 hover:scale-[1.02] group">
-      <div className="w-6 h-6 bg-primary/10 rounded-md flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-300 flex-shrink-0">
-        {icon}
+    <div className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg group relative overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+      <div className="relative z-10 w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300 flex-shrink-0 shadow-sm">
+        <div className="w-4 h-4 flex items-center justify-center text-primary transition-transform duration-300 group-hover:scale-110">
+          {icon}
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <h3 className="text-xs font-semibold text-foreground">{title}</h3>
-        <p className="text-[10px] text-muted-foreground leading-tight">{description}</p>
+      <div className="flex-1 min-w-0 relative z-10">
+        <h3 className="text-sm font-bold text-foreground leading-tight mb-1">{title}</h3>
+        <p className="text-[10px] text-muted-foreground leading-snug">{description}</p>
       </div>
     </div>
   )
@@ -125,17 +130,24 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Statistics and Features Section - Combined */}
-        <div className="grid grid-cols-3 grid-rows-2 gap-2 max-w-2xl mx-auto">
-          <StatsDisplay />
-          {features.map((feature, index) => (
-            <FeatureCard
-              key={index}
-              icon={feature.icon}
-              title={feature.title}
-              description={feature.description}
-            />
-          ))}
+        {/* Statistics & Features */}
+        <div className="space-y-3 w-full max-w-4xl mx-auto px-4">
+          {/* Statistics - Row 1 */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+            <StatsDisplay />
+          </div>
+
+          {/* Features - Row 2 */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+            {features.map((feature, index) => (
+              <FeatureCard
+                key={index}
+                icon={feature.icon}
+                title={feature.title}
+                description={feature.description}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Main Card - Compact & Enhanced */}
