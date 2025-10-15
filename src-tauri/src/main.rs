@@ -100,6 +100,7 @@ impl ScanState {
         }
     }
 
+    #[cfg(unix)]
     fn is_visited_inode(&self, inode: u64) -> bool {
         if let Ok(visited) = self.visited_inodes.lock() {
             visited.contains(&inode)
@@ -108,6 +109,7 @@ impl ScanState {
         }
     }
 
+    #[cfg(unix)]
     fn mark_visited_inode(&self, inode: u64) -> bool {
         if let Ok(mut visited) = self.visited_inodes.lock() {
             visited.insert(inode)
