@@ -39,31 +39,81 @@ function StatCard({ icon, label, value, unit, formatValue, color }: StatCardProp
   )
 }
 
-// 格式化檔案大小
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  const value = bytes / Math.pow(k, i)
-
-  // 根據大小調整小數位數
-  if (value >= 100) {
-    return Math.round(value).toString()
-  } else if (value >= 10) {
+// 格式化數字到 5 個字符，不夠用小數點補足
+function formatToFiveDigits(value: number): string {
+  if (value >= 10000) return '99999'
+  if (value >= 1000) {
+    // 4 位整數 -> 補 1 位小數 -> 5 個字符 (例: 1234.5)
     return value.toFixed(1)
-  } else {
+  }
+  if (value >= 100) {
+    // 3 位整數 -> 補 2 位小數 -> 5 個字符 (例: 123.45)
     return value.toFixed(2)
   }
+  if (value >= 10) {
+    // 2 位整數 -> 補 3 位小數 -> 5 個字符 (例: 12.345)
+    return value.toFixed(3)
+  }
+  // 1 位整數 -> 補 4 位小數 -> 5 個字符 (例: 1.2345)
+  return value.toFixed(4)
+}
+
+// 格式化檔案數量
+function formatCount(count: number): string {
+  if (count === 0) return '0.000'
+
+  // 億個 (100,000,000+)
+  if (count >= 100000000) {
+    return formatToFiveDigits(count / 100000000)
+  }
+
+  // 萬個 (10,000+)
+  if (count >= 10000) {
+    return formatToFiveDigits(count / 10000)
+  }
+
+  // 個 (<10,000)
+  return formatToFiveDigits(count)
+}
+
+// 獲取檔案數量單位
+function getCountUnit(count: number): string {
+  if (count >= 100000000) return '億個'
+  if (count >= 10000) return '萬個'
+  return '個'
+}
+
+// 格式化檔案大小
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0.000'
+  const k = 1024
+
+  // PB
+  if (bytes >= Math.pow(k, 5)) {
+    return formatToFiveDigits(bytes / Math.pow(k, 5))
+  }
+
+  // TB
+  if (bytes >= Math.pow(k, 4)) {
+    return formatToFiveDigits(bytes / Math.pow(k, 4))
+  }
+
+  // GB
+  if (bytes >= Math.pow(k, 3)) {
+    return formatToFiveDigits(bytes / Math.pow(k, 3))
+  }
+
+  // MB (包含 KB 和 B，全部轉成 MB)
+  return formatToFiveDigits(bytes / Math.pow(k, 2))
 }
 
 // 獲取檔案大小單位
 function getBytesUnit(bytes: number): string {
-  if (bytes === 0) return 'B'
+  if (bytes === 0) return 'MB'
   const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const sizes = ['MB', 'MB', 'MB', 'GB', 'TB', 'PB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return sizes[i]
+  return sizes[Math.min(i, sizes.length - 1)]
 }
 
 export function StatsDisplay() {
@@ -111,7 +161,8 @@ export function StatsDisplay() {
         icon={<FileStack className="w-3 h-3" />}
         label="累計掃描檔案"
         value={stats.totalFiles}
-        unit="個"
+        unit={getCountUnit(stats.totalFiles)}
+        formatValue={formatCount}
         color="#8b5cf6"
       />
 

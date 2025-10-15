@@ -38,18 +38,25 @@ export default function HomePage() {
   const [showCards, setShowCards] = useState(true)
   const [showButtons, setShowButtons] = useState(false)
 
-  // 縮短路徑顯示 - 在 / 之間省略
+  // 縮短路徑顯示 - 智能省略，保留開頭和最後兩個資料夾
   const getDisplayPath = (path: string) => {
-    if (path.length <= 40) return path
+    const maxLength = 50
+    if (path.length <= maxLength) return path
 
-    const parts = path.split('/')
+    const parts = path.split('/').filter(p => p.length > 0) // 過濾空字串
     if (parts.length <= 3) return path
 
-    // 保留開頭和結尾各 2 個部分
-    const start = parts.slice(0, 2).join('/')
-    const end = parts.slice(-2).join('/')
+    // 保留第一個部分和最後兩個部分
+    const firstPart = parts[0]
+    const lastTwo = parts.slice(-2)
 
-    return `${start}/.../.../${end}`
+    // 計算省略了多少層
+    const omittedCount = parts.length - 3
+
+    // Windows 路徑 (例如 C:) 或 Unix 路徑 (例如 Users)
+    const prefix = path.startsWith('/') ? '/' : ''
+
+    return `${prefix}${firstPart}/...(${omittedCount})/${lastTwo.join('/')}`
   }
 
   // Feature data
