@@ -162,106 +162,58 @@ function AnalyzeContent() {
   const scanningRef = useRef(false)
 
   const svgRef = useRef<SVGSVGElement>(null)
-  const pendingHoverRef = useRef<string | null>(null)
-  const rafRef = useRef<number | null>(null)
+  const [hoveredSectorId, setHoveredSectorId] = useState<string | null>(null)
 
-  // Hover management - directly manipulate CSS
-  const handleSectorMouseEnter = (sectorId: string) => {
-    // Store the sector ID
-    pendingHoverRef.current = sectorId
-
-    // Cancel previous animation frame
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current)
-    }
-
-    // Use requestAnimationFrame to batch updates
-    rafRef.current = requestAnimationFrame(() => {
-      const finalSectorId = pendingHoverRef.current
-      if (!finalSectorId) return
-
-      applySectorHover(finalSectorId)
-      rafRef.current = null
-    })
+  // Simple hover handlers for chart-file list synchronization
+  const handleSectorHover = (sectorId: string) => {
+    setHoveredSectorId(sectorId)
   }
 
-  const applySectorHover = (sectorId: string) => {
+  const handleChartLeave = () => {
+    setHoveredSectorId(null)
+  }
+
+  const handleFileItemHover = (sectorId: string) => {
+    setHoveredSectorId(sectorId)
+  }
+
+  const handleFileListLeave = () => {
+    setHoveredSectorId(null)
+  }
+
+  // Sync hover states between chart and file list
+  useEffect(() => {
     if (!svgRef.current) return
 
-    // Remove all previous hover/dimmed classes
+    // Update chart sectors
     const allSectors = svgRef.current.querySelectorAll('.chart-sector')
     allSectors.forEach(sector => {
+      const sectorId = sector.getAttribute('data-sector-id')
       sector.classList.remove('hovered', 'dimmed')
-    })
-
-    // Add hovered class to the specific sector
-    const hoveredSector = svgRef.current.querySelector(`[data-sector-id="${sectorId}"]`)
-    if (hoveredSector) {
-      hoveredSector.classList.add('hovered')
-    }
-
-    // Add dimmed class to all other sectors
-    allSectors.forEach(sector => {
-      const id = sector.getAttribute('data-sector-id')
-      if (id !== sectorId) {
+      
+      if (hoveredSectorId && sectorId === hoveredSectorId) {
+        sector.classList.add('hovered')
+      } else if (hoveredSectorId) {
         sector.classList.add('dimmed')
       }
     })
 
-    // Also handle file list items
+    // Update file list items
     const fileListContainer = document.querySelector('.file-list')
     if (fileListContainer) {
       const allFileItems = fileListContainer.querySelectorAll('.file-item')
       allFileItems.forEach(item => {
-        const id = item.getAttribute('data-sector-id')
-        if (id === sectorId) {
+        const sectorId = item.getAttribute('data-sector-id')
+        item.classList.remove('hovered', 'dimmed')
+        
+        if (hoveredSectorId && sectorId === hoveredSectorId) {
           item.classList.add('hovered')
-          item.classList.remove('dimmed')
-        } else {
+        } else if (hoveredSectorId) {
           item.classList.add('dimmed')
-          item.classList.remove('hovered')
         }
       })
     }
-  }
-
-  const handleChartMouseLeave = () => {
-    if (!svgRef.current) return
-
-    // Remove all hover/dimmed classes
-    const allSectors = svgRef.current.querySelectorAll('.chart-sector')
-    allSectors.forEach(sector => {
-      sector.classList.remove('hovered', 'dimmed')
-    })
-
-    // Also clear file list
-    const fileListContainer = document.querySelector('.file-list')
-    if (fileListContainer) {
-      const allFileItems = fileListContainer.querySelectorAll('.file-item')
-      allFileItems.forEach(item => {
-        item.classList.remove('hovered', 'dimmed')
-      })
-    }
-  }
-
-  const handleFileListMouseMove = (event: React.MouseEvent) => {
-    const target = event.target as HTMLElement
-    const fileItem = target.closest('.file-item') as HTMLElement
-    if (fileItem) {
-      const sectorId = fileItem.getAttribute('data-sector-id')
-      if (sectorId) {
-        handleSectorMouseEnter(sectorId)
-      }
-    } else {
-      // Clear hover when moving to empty space in file list
-      handleChartMouseLeave()
-    }
-  }
-
-  const handleFileListMouseLeave = () => {
-    handleChartMouseLeave()
-  }
-
+  }, [hoveredSectorId])
 
   useEffect(() => {
     if (!path) {
@@ -682,12 +634,10 @@ function AnalyzeContent() {
           }
         }
         
-        /* JavaScript controlled hover effects */
+        /* JavaScript controlled hover effects with CSS transitions */
         .chart-sector {
-          transition: opacity 0.15s ease, filter 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease;
-          filter: none !important;
-          stroke: none !important;
-          stroke-width: 0 !important;
+          transition: opacity 0.15s ease;
+          cursor: pointer;
         }
 
         .chart-sector.hovered {
@@ -696,15 +646,17 @@ function AnalyzeContent() {
 
         .chart-sector.dimmed {
           opacity: 0.15 !important;
-          filter: none !important;
-          stroke: none !important;
-          stroke-width: 0 !important;
+        }
+        
+        .file-item {
+          transition: opacity 0.15s ease, background-color 0.15s ease;
+          cursor: pointer;
         }
         
         .file-item.hovered {
           background-color: rgba(239, 68, 68, 0.05) !important;
         }
-        
+
         .file-item.dimmed {
           opacity: 0.3 !important;
         }
@@ -779,7 +731,7 @@ function AnalyzeContent() {
                   opacity: 1,
                   transform: 'scale(1)'
                 }}
-                onMouseLeave={handleChartMouseLeave}
+                onMouseLeave={handleChartLeave}
               >
                     {/* Center size display */}
                     <text
@@ -827,12 +779,12 @@ function AnalyzeContent() {
                                     stroke={item.color}
                                     className="chart-sector"
                                     data-sector-id={sectorId}
+                                    onMouseEnter={() => handleSectorHover(sectorId)}
                                     style={{
                                       cursor: 'pointer',
                                       transition: 'opacity 0.15s ease, filter 0.15s ease',
                                       animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                     }}
-                                    onMouseEnter={() => handleSectorMouseEnter(sectorId)}
                                     onClick={() => {
                                       if (item.node.isDirectory && item.node.children) {
                                         setCurrentLevel(item.node)
@@ -882,12 +834,12 @@ Size: ${formatBytes(item.value)}`}</title>
                                 strokeWidth={0.5}
                                 className="chart-sector"
                                 data-sector-id={sectorId}
+                                onMouseEnter={() => handleSectorHover(sectorId)}
                                 style={{
                                   cursor: 'pointer',
                                   transition: 'opacity 0.15s ease, filter 0.15s ease',
                                   animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                 }}
-                                onMouseEnter={() => handleSectorMouseEnter(sectorId)}
                                 onClick={() => {
                                   if (item.node.isDirectory && item.node.children) {
                                     setCurrentLevel(item.node)
@@ -920,17 +872,16 @@ Size: ${formatBytes(item.value)}`}</title>
           </h2>
           <div 
             className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-0.5 file-list"
-            onMouseMove={handleFileListMouseMove}
-            onMouseLeave={handleFileListMouseLeave}
+            onMouseLeave={handleFileListLeave}
           >
             {chartData.map((item, index) => {
               const sectorId = generateSectorId(item.path, 0)
-
               return (
               <div
                 key={item.path}
                 className="flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent file-item"
                 data-sector-id={sectorId}
+                onMouseEnter={() => handleFileItemHover(sectorId)}
                 onClick={() => handlePieClick(item, index)}
                 title={`${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${item.name} - ${formatBytes(item.value)}`}
               >
