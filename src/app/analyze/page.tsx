@@ -582,20 +582,21 @@ function AnalyzeContent() {
 
               {/* Progress bar - only show for root directory scans */}
               {scanProgress.estimatedTotal > 0 && (() => {
-                const percentage = Math.min(100, (scanProgress.scannedSize / scanProgress.estimatedTotal) * 100);
+                const percentage = (scanProgress.scannedSize / scanProgress.estimatedTotal) * 100;
+                const displayPercentage = Math.min(100, percentage);
                 return (
                   <div className="space-y-2 relative z-10">
                     <div className="flex justify-between items-center text-sm mb-2">
                       <span className="text-muted-foreground">掃描進度（預估）</span>
                       <span className="font-mono text-primary font-semibold">
-                        {Math.round(percentage)}%
+                        {Math.round(displayPercentage)}%
                       </span>
                     </div>
-                    <div style={{ width: '100%' }}>
+                    <div className="w-full">
                       <progress
-                        value={Math.max(0, Math.min(100, percentage))}
+                        value={displayPercentage}
                         max={100}
-                        style={{ width: '100%', height: '12px' }}
+                        className="progress-blue w-full"
                         aria-label="掃描進度"
                       />
                     </div>
@@ -763,7 +764,7 @@ function AnalyzeContent() {
         .file-item.dimmed {
           opacity: 0.3 !important;
         }
-        
+
       `}</style>
       {/* Header */}
       <div className="flex items-center justify-between bg-card/60 backdrop-blur-md border-b border-border/50 px-3 py-2 shadow-sm flex-shrink-0 relative z-20">

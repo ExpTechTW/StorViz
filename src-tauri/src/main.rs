@@ -251,12 +251,23 @@ fn get_disk_info(path: &Path) -> Option<DiskInfo> {
                     found_any = true;
                 }
             } else if path_str.starts_with(&*disk_path) {
-                // For non-root paths, use specific disk
-                total_space = disk.total_space();
-                total_available = disk.available_space();
-                total_used = total_space - total_available;
-                found_any = true;
-                break;
+                // For non-root paths (including external drives), use specific disk
+                let total = disk.total_space();
+                let available = disk.available_space();
+                let used = total - available;
+
+                println!("📊 External disk info for {}: total={} GB, available={} GB, used={} GB",
+                    disk_path,
+                    total / 1024 / 1024 / 1024,
+                    available / 1024 / 1024 / 1024,
+                    used / 1024 / 1024 / 1024
+                );
+
+                return Some(DiskInfo {
+                    total_space: total,
+                    available_space: available,
+                    used_space: used,
+                });
             }
         }
 

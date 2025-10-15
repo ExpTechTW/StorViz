@@ -187,6 +187,31 @@
   background: oklch(0.5 0.04 250);
 }
 
+/* Progress Bar Styling */
+progress[value] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border: none;
+  display: block;
+  height: 12px;
+}
+
+progress[value]::-webkit-progress-bar {
+  background-color: #e5e7eb;
+  border-radius: 9999px;
+}
+
+progress[value]::-webkit-progress-value {
+  background-color: #3b82f6;
+  border-radius: 9999px;
+}
+
+progress[value]::-moz-progress-bar {
+  background-color: #3b82f6;
+  border-radius: 9999px;
+}
+
 /* SVG Animations */
 @keyframes fadeIn {
   from {
