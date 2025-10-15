@@ -1,6 +1,6 @@
 {
   "productName": "StorViz",
-  "version": "1.0.0-pre.1",
+  "version": "1.0.0-pre.2",
   "identifier": "com.storviz",
   "build": {
     "beforeDevCommand": "bun run dev",
