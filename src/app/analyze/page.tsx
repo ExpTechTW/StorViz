@@ -164,87 +164,52 @@ function AnalyzeContent() {
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoveredSectorId, setHoveredSectorId] = useState<string | null>(null)
 
-  // Simple hover handlers for chart-file list synchronization
-  const handleSectorHover = (sectorId: string) => {
-    setHoveredSectorId(sectorId)
-  }
-
-  const handleChartLeave = () => {
-    setHoveredSectorId(null)
-  }
-
-  const handleFileItemHover = (sectorId: string) => {
-    setHoveredSectorId(sectorId)
-  }
-
-  const handleFileListLeave = () => {
-    setHoveredSectorId(null)
-  }
+  // Hover handlers
+  const handleHover = (sectorId: string) => setHoveredSectorId(sectorId)
+  const handleLeave = () => setHoveredSectorId(null)
 
   // Sync hover states between chart and file list
   useEffect(() => {
     if (!svgRef.current) return
 
+    const updateElements = (elements: NodeListOf<Element>, className: string) => {
+      elements.forEach(element => {
+        const sectorId = element.getAttribute('data-sector-id')
+        element.classList.remove('hovered', 'dimmed')
+        
+        if (hoveredSectorId && sectorId === hoveredSectorId) {
+          element.classList.add('hovered')
+        } else if (hoveredSectorId) {
+          element.classList.add('dimmed')
+        }
+      })
+    }
+
     // Update chart sectors
-    const allSectors = svgRef.current.querySelectorAll('.chart-sector')
-    allSectors.forEach(sector => {
-      const sectorId = sector.getAttribute('data-sector-id')
-      sector.classList.remove('hovered', 'dimmed')
-      
-      if (hoveredSectorId && sectorId === hoveredSectorId) {
-        sector.classList.add('hovered')
-      } else if (hoveredSectorId) {
-        sector.classList.add('dimmed')
-      }
-    })
+    updateElements(svgRef.current.querySelectorAll('.chart-sector'), 'chart-sector')
 
     // Update file list items
     const fileListContainer = document.querySelector('.file-list')
     if (fileListContainer) {
-      const allFileItems = fileListContainer.querySelectorAll('.file-item')
-      allFileItems.forEach(item => {
-        const sectorId = item.getAttribute('data-sector-id')
-        item.classList.remove('hovered', 'dimmed')
-        
-        if (hoveredSectorId && sectorId === hoveredSectorId) {
-          item.classList.add('hovered')
-        } else if (hoveredSectorId) {
-          item.classList.add('dimmed')
-        }
-      })
+      updateElements(fileListContainer.querySelectorAll('.file-item'), 'file-item')
     }
   }, [hoveredSectorId])
 
   useEffect(() => {
-    if (!path) {
-      console.log('❌ analyze 頁面: 沒有 path 參數')
-      return
-    }
+    if (!path) return
 
     // Prevent duplicate scans
-    if (scanningRef.current) {
-      console.log('⏭️ 掃描已在進行中，跳過')
-      return
-    }
-
-    console.log('✅ analyze 頁面載入，path:', path)
+    if (scanningRef.current) return
 
     const scanFolder = async () => {
       try {
         scanningRef.current = true
-        console.log('📂 開始掃描流程...')
         setIsLoading(true)
         setScanProgress({ currentPath: path, filesScanned: 0, scannedSize: 0, estimatedTotal: 0 })
-
-        console.log('👂 設置批次監聽器 (使用 Channel)...')
 
         // Create channel for streaming batches
         const onBatch = new Channel<{ nodes: FileNode[]; total_scanned: number; total_size: number; is_complete: boolean; root_node?: FileNode }>()
         onBatch.onmessage = (message) => {
-          console.log('📦 收到批次訊息!')
-          console.log('📦 收到批次:', message.total_scanned, '個項目，總大小:', (message.total_size / (1024 * 1024 * 1024)).toFixed(2), 'GB')
-          console.log('📦 is_complete:', message.is_complete)
-
           // Update progress
           setScanProgress({
             currentPath: path,
@@ -255,43 +220,27 @@ function AnalyzeContent() {
 
           // If complete, use root_node from the message
           if (message.is_complete && message.root_node) {
-            console.log('✅ 流式掃描完成！設置顯示資料...')
             setData(message.root_node)
             setCurrentLevel(message.root_node)
             setBreadcrumb([message.root_node])
             setDiskInfo(null)
             setIsLoading(false)
             setScanProgress(null)
-            console.log('🎉 顯示資料設置完成')
           }
         }
-        console.log('✅ Channel 設置完成')
 
         // Start streaming scan (returns immediately, scanning in background)
-        console.log('🚀 啟動流式掃描，path:', path)
         await invoke('scan_directory_streaming', { path, onBatch })
-        console.log('✅ 背景掃描已啟動')
-
-        // Data will be set when scan completes (via event listener)
       } catch (error) {
-        console.error('❌ 掃描失敗:', error)
-        console.error('錯誤詳情:', JSON.stringify(error))
+        console.error('掃描失敗:', error)
         setIsLoading(false)
         setScanProgress(null)
-        // Backend handles deduplication, silently ignore duplicate scan errors
       } finally {
         scanningRef.current = false
       }
     }
 
-    // Start scanning immediately
-    console.log('⏰ 準備開始掃描...')
     scanFolder()
-
-    // Cleanup function
-    return () => {
-      console.log('🧹 清理 useEffect')
-    }
   }, [path])
 
   // Helper functions must be defined before use
@@ -731,7 +680,7 @@ function AnalyzeContent() {
                   opacity: 1,
                   transform: 'scale(1)'
                 }}
-                onMouseLeave={handleChartLeave}
+                onMouseLeave={handleLeave}
               >
                     {/* Center size display */}
                     <text
@@ -779,10 +728,9 @@ function AnalyzeContent() {
                                     stroke={item.color}
                                     className="chart-sector"
                                     data-sector-id={sectorId}
-                                    onMouseEnter={() => handleSectorHover(sectorId)}
+                                    onMouseEnter={() => handleHover(sectorId)}
                                     style={{
                                       cursor: 'pointer',
-                                      transition: 'opacity 0.15s ease, filter 0.15s ease',
                                       animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                     }}
                                     onClick={() => {
@@ -834,10 +782,9 @@ Size: ${formatBytes(item.value)}`}</title>
                                 strokeWidth={0.5}
                                 className="chart-sector"
                                 data-sector-id={sectorId}
-                                onMouseEnter={() => handleSectorHover(sectorId)}
+                                onMouseEnter={() => handleHover(sectorId)}
                                 style={{
                                   cursor: 'pointer',
-                                  transition: 'opacity 0.15s ease, filter 0.15s ease',
                                   animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
                                 }}
                                 onClick={() => {
@@ -872,7 +819,7 @@ Size: ${formatBytes(item.value)}`}</title>
           </h2>
           <div 
             className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-0.5 file-list"
-            onMouseLeave={handleFileListLeave}
+            onMouseLeave={handleLeave}
           >
             {chartData.map((item, index) => {
               const sectorId = generateSectorId(item.path, 0)
@@ -881,7 +828,7 @@ Size: ${formatBytes(item.value)}`}</title>
                 key={item.path}
                 className="flex items-center justify-between p-2 rounded transition-all cursor-pointer border border-transparent file-item"
                 data-sector-id={sectorId}
-                onMouseEnter={() => handleFileItemHover(sectorId)}
+                onMouseEnter={() => handleHover(sectorId)}
                 onClick={() => handlePieClick(item, index)}
                 title={`${getFileTypeInfo(item.name, item.node.isDirectory).icon} ${item.name} - ${formatBytes(item.value)}`}
               >
