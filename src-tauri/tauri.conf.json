@@ -1,6 +1,6 @@
 {
   "productName": "StorViz",
-  "version": "1.0.0-pre.2",
+  "version": "1.0.0-rc.1",
   "identifier": "com.storviz",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -18,9 +18,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "audios/*"
-    ],
+    "resources": ["audios/*"],
     "macOS": {
       "minimumSystemVersion": "10.13",
       "entitlements": "Entitlements.plist"
