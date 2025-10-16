@@ -789,7 +789,7 @@ function AnalyzeContent() {
   }
 
   // Helper functions must be defined before use
-  const prepareMultiLayerData = (rootNode: FileNode | null, maxDepth: number = 10): LayerData[] => {
+  const prepareMultiLayerData = (rootNode: FileNode | null, maxDepth: number = 8): LayerData[] => {
     if (!rootNode || !rootNode.children) return []
 
     const layers: Map<number, ChartData[]> = new Map()
