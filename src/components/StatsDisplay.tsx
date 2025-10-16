@@ -108,7 +108,7 @@ function getCountUnit(count: number): string {
 // 格式化檔案大小
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0.000'
-  const k = 1024
+  const k = 1000
 
   // PB
   if (bytes >= Math.pow(k, 5)) {
@@ -132,7 +132,7 @@ function formatBytes(bytes: number): string {
 // 獲取檔案大小單位
 function getBytesUnit(bytes: number): string {
   if (bytes === 0) return 'MB'
-  const k = 1024
+  const k = 1000
   const sizes = ['MB', 'MB', 'MB', 'GB', 'TB', 'PB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return sizes[Math.min(i, sizes.length - 1)]
