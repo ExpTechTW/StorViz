@@ -17,7 +17,8 @@
       "Bash(then echo \"D:\\TslGame exists\")",
       "Bash(else echo \"D:\\TslGame does NOT exist\")",
       "Bash(bun add:*)",
-      "Bash(bun remove:*)"
+      "Bash(bun remove:*)",
+      "Read(//Users/yuyu1015/.tauri/**)"
     ],
     "deny": [],
     "ask": []

@@ -52,7 +52,12 @@
             "dialog:allow-ask",
             "core:default",
             "shell:default",
-            "shell:allow-open"
+            "shell:allow-open",
+            "updater:default",
+            "updater:allow-check",
+            "updater:allow-download",
+            "updater:allow-install",
+            "updater:allow-download-and-install"
           ]
         }
       ]
@@ -60,7 +65,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "/Users/yuyu1015/.tauri/storviz.key.pub",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMwNzQ2MEY3NjdEM0QyQzgKUldUSTB0Tm45MkIwd0wzcXlZbis3cmJCMXFoeG1neGhMOFNLdjVSdWdhZmZERDY2K3F4RmRMc04K",
       "endpoints": [
         "https://github.com/ExpTechTW/StorViz/releases/latest/download/latest.json"
       ],
