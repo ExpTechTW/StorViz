@@ -1,6 +1,6 @@
 {
   "productName": "StorViz",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.2",
   "identifier": "com.storviz",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -23,7 +23,7 @@
     "macOS": {
       "minimumSystemVersion": "10.13",
       "entitlements": "Entitlements.plist",
-      "signingIdentity": "Developer ID Application: ExpTech (98Q7JARYZF)"
+      "signingIdentity": null
     }
   },
   "app": {
