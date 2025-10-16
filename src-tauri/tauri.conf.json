@@ -1,6 +1,6 @@
 {
   "productName": "StorViz",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0-rc.3",
   "identifier": "com.storviz",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -10,6 +10,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis", "dmg"],
     "icon": [
       "icons/32x32.png",
@@ -55,6 +56,17 @@
           ]
         }
       ]
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "/Users/yuyu1015/.tauri/storviz.key.pub",
+      "endpoints": [
+        "https://github.com/ExpTechTW/StorViz/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }
