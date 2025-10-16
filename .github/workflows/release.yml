@@ -46,7 +46,9 @@ jobs:
         run: bun run build
 
       - name: Import Code-Signing Certificates (macOS)
-        if: matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE != ''
+        if: matrix.platform == 'macos-latest' && env.APPLE_CERTIFICATE != ''
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
         uses: apple-actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
