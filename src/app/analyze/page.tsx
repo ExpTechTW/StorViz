@@ -37,11 +37,6 @@ interface LayerData {
   depth: number
 }
 
-const COLORS = [
-  '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981',
-  '#06b6d4', '#6366f1', '#f43f5e', '#84cc16', '#a855f7',
-]
-
 // Simple hash function to generate unique ID for each sector
 function generateSectorId(path: string, depth: number): string {
   const str = `${path}-${depth}`
@@ -65,17 +60,99 @@ function hashName(name: string): number {
   return Math.abs(hash)
 }
 
-// Color schemes for each folder - same folder uses same color family
-const COLOR_SCHEMES = [
-  ['#1e40af', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'], // Blue
-  ['#6b21a8', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe'], // Purple
-  ['#be185d', '#ec4899', '#f472b6', '#f9a8d4', '#fce7f3'], // Pink
-  ['#b45309', '#f59e0b', '#fbbf24', '#fcd34d', '#fef3c7'], // Amber
-  ['#047857', '#10b981', '#34d399', '#6ee7b7', '#d1fae5'], // Green
-  ['#0369a1', '#0ea5e9', '#38bdf8', '#7dd3fc', '#e0f2fe'], // Sky
-  ['#4338ca', '#6366f1', '#818cf8', '#a5b4fc', '#e0e7ff'], // Indigo
-  ['#be123c', '#f43f5e', '#fb7185', '#fda4af', '#fecdd3'], // Rose
-]
+// Generate HSL color based on hash
+function generateColorFromHash(name: string, depth: number = 0): string {
+  const hash = hashName(name)
+  
+  // Generate hue from hash (0-360)
+  const hue = hash % 360
+  
+  // Generate saturation and lightness based on depth
+  // Deeper levels have lower saturation and higher lightness (lighter colors)
+  const saturation = Math.max(20, 80 - depth * 15) // 80% to 20%
+  const lightness = Math.min(80, 40 + depth * 8) // 40% to 80%
+  
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`
+}
+
+// Mix color with white based on depth
+function mixColorWithWhite(baseColor: string, depth: number): string {
+  // Convert HSL to RGB for mixing
+  const hslMatch = baseColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/)
+  if (!hslMatch) return baseColor
+  
+  const hue = parseInt(hslMatch[1])
+  const saturation = parseInt(hslMatch[2])
+  const lightness = parseInt(hslMatch[3])
+  
+  // Convert HSL to RGB
+  const h = hue / 360
+  const s = saturation / 100
+  const l = lightness / 100
+  
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1
+    if (t > 1) t -= 1
+    if (t < 1/6) return p + (q - p) * 6 * t
+    if (t < 1/2) return q
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6
+    return p
+  }
+  
+  let r, g, b
+  if (s === 0) {
+    r = g = b = l // achromatic
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+    const p = 2 * l - q
+    r = hue2rgb(p, q, h + 1/3)
+    g = hue2rgb(p, q, h)
+    b = hue2rgb(p, q, h - 1/3)
+  }
+  
+  // Mix with white based on depth (more white = lighter)
+  const whiteAmount = Math.min(0.8, depth * 0.2) // Max 80% white at depth 4+
+  r = r + (1 - r) * whiteAmount
+  g = g + (1 - g) * whiteAmount
+  b = b + (1 - b) * whiteAmount
+  
+  // Convert back to HSL
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  let newHue = 0
+  let newSaturation = 0
+  const newLightness = (max + min) / 2
+  
+  if (max !== min) {
+    const d = max - min
+    newSaturation = newLightness > 0.5 ? d / (2 - max - min) : d / (max + min)
+    
+    switch (max) {
+      case r: newHue = (g - b) / d + (g < b ? 6 : 0); break
+      case g: newHue = (b - r) / d + 2; break
+      case b: newHue = (r - g) / d + 4; break
+    }
+    newHue /= 6
+  }
+  
+  return `hsl(${Math.round(newHue * 360)}, ${Math.round(newSaturation * 100)}%, ${Math.round(newLightness * 100)}%)`
+}
+
+// Generate color scheme for a name (base color + lighter variants)
+function generateColorScheme(name: string): string[] {
+  const hash = hashName(name)
+  const hue = hash % 360
+  
+  const schemes = []
+  for (let i = 0; i < 5; i++) {
+    const saturation = Math.max(20, 80 - i * 15)
+    const lightness = Math.min(80, 40 + i * 8)
+    schemes.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`)
+  }
+  
+  return schemes
+}
+
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -724,7 +801,7 @@ function AnalyzeContent() {
       depth: number,
       startAngle: number,
       endAngle: number,
-      parentColorIndex: number
+      parentColor?: string
     ) => {
       if (depth >= maxDepth || !nodes || nodes.length === 0) return
 
@@ -747,10 +824,12 @@ function AnalyzeContent() {
           return
         }
 
-        // Get color for this node - use same color scheme as parent but lighter for deeper levels
-        const colorScheme = COLOR_SCHEMES[parentColorIndex % COLOR_SCHEMES.length]
-        const colorIndex = Math.min(depth, colorScheme.length - 1)
-        const color = colorScheme[colorIndex]
+        // Get color for this node - use parent color mixed with white for deeper levels
+        const color = depth === 0 
+          ? generateColorFromHash(node.name, 0)
+          : parentColor 
+            ? mixColorWithWhite(parentColor, depth)
+            : generateColorFromHash(node.name, depth)
 
         // Add to current layer
         if (!layers.has(depth)) {
@@ -774,7 +853,7 @@ function AnalyzeContent() {
             depth + 1,
             currentAngle,
             nodeEndAngle,
-            parentColorIndex
+            color
           )
         }
 
@@ -821,11 +900,8 @@ function AnalyzeContent() {
         const nodeAngleRange = 360 * proportion
         const nodeEndAngle = currentAngle + nodeAngleRange
 
-        // Use name hash for consistent color assignment
-        const nameHash = hashName(node.name)
-        const colorSchemeIndex = nameHash % COLOR_SCHEMES.length
-        const colorScheme = COLOR_SCHEMES[colorSchemeIndex]
-        const color = colorScheme[0]
+        // Generate color based on name hash
+        const color = generateColorFromHash(node.name, 0)
 
         if (!layers.has(0)) {
           layers.set(0, [])
@@ -843,7 +919,7 @@ function AnalyzeContent() {
 
         // Process children
         if (node.isDirectory && node.children && node.children.length > 0) {
-          buildHierarchy(node.children, 1, currentAngle, nodeEndAngle, colorSchemeIndex)
+          buildHierarchy(node.children, 1, currentAngle, nodeEndAngle, color)
         }
 
         currentAngle = nodeEndAngle
@@ -886,7 +962,8 @@ function AnalyzeContent() {
           const nodeEndAngle = tinyNodeAngle + nodeAngleRange
 
           if (node.isDirectory && node.children && node.children.length > 0) {
-            buildHierarchy(node.children, 1, tinyNodeAngle, nodeEndAngle, COLOR_SCHEMES.length - 1)
+            const tinyNodeColor = generateColorFromHash(node.name, 0)
+            buildHierarchy(node.children, 1, tinyNodeAngle, nodeEndAngle, tinyNodeColor)
           }
 
           tinyNodeAngle = nodeEndAngle
@@ -979,11 +1056,8 @@ function AnalyzeContent() {
       const nodeAngleRange = 360 * proportion
       const isTinyNode = nodeAngleRange < 1
 
-      // Use same color assignment logic as pie chart for consistency
-      const nameHash = hashName(child.name)
-      const colorSchemeIndex = nameHash % COLOR_SCHEMES.length
-      const colorScheme = COLOR_SCHEMES[colorSchemeIndex]
-      const color = colorScheme[0] // Use the darkest color from the scheme
+      // Generate color based on name hash
+      const color = generateColorFromHash(child.name, 0)
 
       return {
         name: child.name,
