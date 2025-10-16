@@ -1736,7 +1736,7 @@ function AnalyzeContent() {
           </div>
           <div
             ref={listContainerRef}
-            className="flex-1 file-list overflow-hidden"
+            className="flex-1 file-list overflow-y-auto custom-scrollbar"
             onMouseLeave={handleLeave}
           >
             <div
