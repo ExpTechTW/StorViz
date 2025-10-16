@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "儲存空間視覺化分析工具"
 authors = ["you"]
 edition = "2021"
+license = "AGPL-3.0"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
