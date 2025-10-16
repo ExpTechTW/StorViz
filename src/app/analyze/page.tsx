@@ -2,11 +2,14 @@
 
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2, X } from 'lucide-react'
+import { ArrowLeft, Loader2, X, ArrowUpDown } from 'lucide-react'
 import { invoke, Channel } from '@tauri-apps/api/core'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getFileTypeInfo } from '@/lib/fileTypeUtils'
 import { updateStats, updateDeleteStats } from '@/lib/statsStorage'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { toast } from 'sonner'
+import { Toaster } from '@/components/ui/sonner'
 
 interface FileNode {
   name: string
@@ -194,6 +197,12 @@ function AnalyzeContent() {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
   const [deletionProgress, setDeletionProgress] = useState<{ current: number; total: number; currentPath: string } | null>(null)
+  const [showDeleteButton, setShowDeleteButton] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'name' | 'size'>('size')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
   // Use ref to track component state
   const scanningRef = useRef(false)
@@ -266,34 +275,109 @@ function AnalyzeContent() {
     }
   }
 
-  // Toggle file selection
+  // Toggle file selection with parent-child conflict handling
   const toggleFileSelection = (path: string, event: React.MouseEvent) => {
     // Prevent navigation when selecting
     event.stopPropagation()
 
     setSelectedFiles(prev => {
       const newSet = new Set(prev)
+      const normalizedPath = path.toLowerCase().replace(/\\/g, '/')
+
       if (newSet.has(path)) {
+        // Deselect this file/folder
         newSet.delete(path)
       } else {
+        // Select this file/folder
+
+        // Remove all children if this is a parent being selected
+        const toRemove: string[] = []
+        newSet.forEach(selectedPath => {
+          const normalizedSelected = selectedPath.toLowerCase().replace(/\\/g, '/')
+          // If selected path starts with current path, it's a child
+          if (normalizedSelected.startsWith(normalizedPath + '/')) {
+            toRemove.push(selectedPath)
+          }
+        })
+        toRemove.forEach(p => newSet.delete(p))
+
+        // Remove parent if this is a child being selected
+        newSet.forEach(selectedPath => {
+          const normalizedSelected = selectedPath.toLowerCase().replace(/\\/g, '/')
+          // If current path starts with selected path, selected is a parent
+          if (normalizedPath.startsWith(normalizedSelected + '/')) {
+            toRemove.push(selectedPath)
+          }
+        })
+        toRemove.forEach(p => newSet.delete(p))
+
+        // Add the new selection
         newSet.add(path)
       }
+
       return newSet
     })
   }
 
-  // Calculate total size of selected files
+  // Calculate total size of selected files (from entire tree, not just current level)
   const getSelectedTotalSize = (): number => {
-    if (!currentLevel?.children) return 0
+    if (!data) return 0
 
-    return currentLevel.children
-      .filter(child => selectedFiles.has(child.path))
-      .reduce((sum, child) => sum + child.size, 0)
+    let totalSize = 0
+
+    // Recursively find and sum all selected files
+    const findAndSum = (node: FileNode) => {
+      if (selectedFiles.has(node.path)) {
+        totalSize += node.size
+        return // Don't recurse into selected folders
+      }
+
+      if (node.children) {
+        node.children.forEach(child => findAndSum(child))
+      }
+    }
+
+    findAndSum(data)
+    return totalSize
   }
 
-  // Handle batch deletion
+  // Check if any parent of this path is selected
+  const hasSelectedParent = (path: string): boolean => {
+    const normalizedPath = path.toLowerCase().replace(/\\/g, '/')
+
+    for (const selectedPath of selectedFiles) {
+      const normalizedSelected = selectedPath.toLowerCase().replace(/\\/g, '/')
+      // If current path starts with selected path, selected is a parent
+      if (normalizedPath.startsWith(normalizedSelected + '/')) {
+        return true
+      }
+    }
+    return false
+  }
+
+  // Check if any child of this path is selected
+  const hasSelectedChild = (path: string): boolean => {
+    const normalizedPath = path.toLowerCase().replace(/\\/g, '/')
+
+    for (const selectedPath of selectedFiles) {
+      const normalizedSelected = selectedPath.toLowerCase().replace(/\\/g, '/')
+      // If selected path starts with current path, it's a child
+      if (normalizedSelected.startsWith(normalizedPath + '/')) {
+        return true
+      }
+    }
+    return false
+  }
+
+  // Handle batch deletion with confirmation
   const handleBatchDelete = async () => {
     if (selectedFiles.size === 0) return
+    setShowDeleteDialog(true)
+  }
+
+  // Confirm deletion
+  const confirmDeletion = async () => {
+    setShowDeleteDialog(false)
 
     try {
       setIsDeleting(true)
@@ -312,6 +396,7 @@ function AnalyzeContent() {
 
       let totalDeletedSize = 0
       let totalDeletedCount = 0
+      let allSuccess = false
 
       onProgress.onmessage = (message) => {
         setDeletionProgress({
@@ -323,10 +408,23 @@ function AnalyzeContent() {
         if (message.completed) {
           totalDeletedSize = message.deleted_size || 0
           totalDeletedCount = message.deleted_count || 0
+          allSuccess = message.success
 
-          // Update stats storage
+          // Only update stats and tree if deletion was successful
           if (totalDeletedCount > 0 && totalDeletedSize > 0) {
             updateDeleteStats(totalDeletedCount, totalDeletedSize)
+
+            // Rebuild tree by removing deleted nodes
+            if (data && currentLevel) {
+              const updatedTree = removeDeletedNodes(data, pathsToDelete.slice(0, totalDeletedCount))
+              setData(updatedTree)
+
+              // Update current level reference
+              const updatedCurrentLevel = findNodePath(updatedTree, currentLevel.path)
+              if (updatedCurrentLevel) {
+                setCurrentLevel(updatedCurrentLevel[updatedCurrentLevel.length - 1])
+              }
+            }
           }
 
           // Clear selection and refresh data
@@ -334,16 +432,18 @@ function AnalyzeContent() {
           setIsDeleting(false)
           setDeletionProgress(null)
 
-          // Rebuild tree by removing deleted nodes
-          if (data && currentLevel) {
-            const updatedTree = removeDeletedNodes(data, pathsToDelete)
-            setData(updatedTree)
-
-            // Update current level reference
-            const updatedCurrentLevel = findNodePath(updatedTree, currentLevel.path)
-            if (updatedCurrentLevel) {
-              setCurrentLevel(updatedCurrentLevel[updatedCurrentLevel.length - 1])
-            }
+          // Show toast notification
+          if (allSuccess) {
+            toast.success(`成功刪除 ${totalDeletedCount} 個項目`, {
+              description: `釋放空間：${formatBytes(totalDeletedSize)}`,
+              duration: 5000,
+            })
+          } else {
+            const failedCount = pathsToDelete.length - totalDeletedCount
+            toast.error(`刪除完成，但有 ${failedCount} 個項目失敗`, {
+              description: `成功：${totalDeletedCount}，失敗：${failedCount}`,
+              duration: 7000,
+            })
           }
         }
       }
@@ -353,6 +453,10 @@ function AnalyzeContent() {
 
     } catch (error) {
       console.error('❌ 批次刪除失敗:', error)
+      toast.error('刪除失敗', {
+        description: error instanceof Error ? error.message : '未知錯誤',
+        duration: 5000,
+      })
       setIsDeleting(false)
       setDeletionProgress(null)
     }
@@ -813,13 +917,35 @@ function AnalyzeContent() {
     return result.sort((a, b) => a.depth - b.depth)
   }
 
+  // Toggle sorting
+  const toggleSort = (newSortBy: 'name' | 'size') => {
+    if (sortBy === newSortBy) {
+      // Toggle order if clicking the same column
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Set new sort column with default order
+      setSortBy(newSortBy)
+      setSortOrder(newSortBy === 'size' ? 'desc' : 'asc')
+    }
+  }
+
   // Prepare list data (for file list - shows all items)
   const prepareListData = (node: FileNode | null): ChartData[] => {
     if (!node || !node.children) return []
 
-    const sortedChildren = node.children
+    const sortedChildren = [...node.children]
       .filter(child => child.size > 0)
-      .sort((a, b) => b.size - a.size)
+      .sort((a, b) => {
+        if (sortBy === 'size') {
+          return sortOrder === 'desc' ? b.size - a.size : a.size - b.size
+        } else {
+          const nameA = a.name.toLowerCase()
+          const nameB = b.name.toLowerCase()
+          return sortOrder === 'desc'
+            ? nameB.localeCompare(nameA)
+            : nameA.localeCompare(nameB)
+        }
+      })
 
     // Calculate if viewing disk root
     const isDiskRoot = diskInfo !== null && node === data
@@ -1207,7 +1333,8 @@ function AnalyzeContent() {
   }
 
   return (
-    <div className="w-[840px] h-[630px] bg-gradient-to-br from-background via-background to-muted/10 overflow-hidden flex flex-col relative">
+    <div className="relative w-[840px] h-screen max-h-screen overflow-hidden">
+      <div className="w-full h-full bg-gradient-to-br from-background via-background to-muted/10 flex flex-col relative">
       {/* Background Tech Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-primary/5 rounded-full blur-3xl animate-pulse"></div>
@@ -1310,7 +1437,7 @@ function AnalyzeContent() {
       </div>
 
       <div className="flex-1 grid grid-cols-[1fr_260px] overflow-hidden relative z-20">
-        <div className="bg-card/60 backdrop-blur-md border-r border-border/50 p-3 flex flex-col overflow-hidden">
+        <div className="bg-card/60 backdrop-blur-md border-r border-border/50 p-3 flex flex-col overflow-hidden relative">
           <div className="flex items-center justify-between mb-2 flex-shrink-0">
             <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
               <span className="w-0.5 h-3 bg-primary rounded-full"></span>
@@ -1324,7 +1451,7 @@ function AnalyzeContent() {
             </div>
           </div>
           {layers.length > 0 ? (
-            <div className="flex-1 flex items-center justify-center overflow-hidden">
+            <div className="flex-1 flex items-center justify-center" style={{ overflow: 'hidden' }}>
               <svg
                 ref={svgRef}
                 key={currentLevel?.path || 'root'}
@@ -1469,13 +1596,45 @@ function AnalyzeContent() {
         </div>
 
         <div className="bg-card/60 backdrop-blur-md p-3 flex flex-col overflow-hidden">
-          <h2 className="text-xs font-semibold mb-2 text-foreground flex items-center gap-1.5 flex-shrink-0">
-            <span className="w-0.5 h-3 bg-primary rounded-full"></span>
-            Files & Folders ({listData.length})
-          </h2>
+          <div className="flex items-center justify-between mb-2 flex-shrink-0">
+            <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <span className="w-0.5 h-3 bg-primary rounded-full"></span>
+              Files & Folders ({listData.length})
+            </h2>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => toggleSort('name')}
+                className={`px-2 py-1 text-[10px] rounded-md flex items-center gap-1 transition-all duration-200 ${
+                  sortBy === 'name'
+                    ? 'bg-primary/20 text-primary border border-primary/40'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted/80'
+                }`}
+                title="按名稱排序"
+              >
+                名稱
+                {sortBy === 'name' && (
+                  <ArrowUpDown className={`w-3 h-3 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} />
+                )}
+              </button>
+              <button
+                onClick={() => toggleSort('size')}
+                className={`px-2 py-1 text-[10px] rounded-md flex items-center gap-1 transition-all duration-200 ${
+                  sortBy === 'size'
+                    ? 'bg-primary/20 text-primary border border-primary/40'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted/80'
+                }`}
+                title="按大小排序"
+              >
+                大小
+                {sortBy === 'size' && (
+                  <ArrowUpDown className={`w-3 h-3 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} />
+                )}
+              </button>
+            </div>
+          </div>
           <div
             ref={listContainerRef}
-            className="flex-1 file-list overflow-y-auto custom-scrollbar"
+            className="flex-1 file-list overflow-hidden"
             onMouseLeave={handleLeave}
           >
             <div
@@ -1491,6 +1650,10 @@ function AnalyzeContent() {
                 const fileTypeInfo = getFileTypeInfo(item.name, item.node.isDirectory)
                 const IconComponent = fileTypeInfo.icon
                 const isSelected = selectedFiles.has(item.path)
+                const parentSelected = hasSelectedParent(item.path)
+                const childSelected = hasSelectedChild(item.path)
+                const isIndeterminate = !isSelected && (parentSelected || childSelected)
+                const willBeDeleted = isSelected || parentSelected
 
                 return (
                   <div
@@ -1506,7 +1669,13 @@ function AnalyzeContent() {
                   >
                     <div
                       className={`flex items-center justify-between p-2 rounded transition-all duration-300 cursor-pointer border file-item hover:bg-card/80 hover:border-primary/20 hover:scale-[1.02] hover:shadow-md group relative overflow-hidden mx-1 ${
-                        isSelected ? 'bg-primary/10 border-primary/40' : 'border-transparent'
+                        isSelected 
+                          ? 'bg-primary/10 border-primary/40' 
+                          : willBeDeleted 
+                          ? 'bg-blue-500/10 border-blue-500/40' 
+                          : isIndeterminate 
+                          ? 'bg-muted/30 border-muted-foreground/20' 
+                          : 'border-transparent'
                       }`}
                       data-sector-id={sectorId}
                       onMouseEnter={(e) => handleHover(sectorId, e, fileTypeInfo.label, item.name, formatBytes(item.value), fileTypeInfo.icon, fileTypeInfo.color)}
@@ -1520,12 +1689,16 @@ function AnalyzeContent() {
                           className={`w-4 h-4 flex-shrink-0 rounded border-2 flex items-center justify-center transition-all ${
                             isSelected
                               ? 'bg-primary border-primary'
+                              : willBeDeleted
+                              ? 'bg-blue-500 border-blue-500'
+                              : isIndeterminate
+                              ? 'bg-muted-foreground/30 border-muted-foreground/50'
                               : 'border-muted-foreground/30 hover:border-primary/50'
                           }`}
                           onClick={(e) => toggleFileSelection(item.path, e)}
                         >
-                          {isSelected && (
-                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {(isSelected || willBeDeleted || isIndeterminate) && (
+                            <svg className={`w-3 h-3 ${isSelected ? 'text-white' : willBeDeleted ? 'text-white' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                             </svg>
                           )}
@@ -1588,59 +1761,104 @@ function AnalyzeContent() {
         </div>
       )}
 
-      {/* Delete Button - Bottom Right */}
+      </div>
+
+      {/* Delete Button - Bottom Right of Chart, Outside File List */}
       {selectedFiles.size > 0 && (
-        <div className="fixed bottom-4 right-4 z-30 animate-in slide-in-from-bottom duration-300">
-          <div className="bg-card/90 backdrop-blur-md border-2 border-destructive/50 rounded-lg shadow-2xl p-3 space-y-2 relative overflow-hidden">
+        <div
+          className="absolute bottom-4 right-[276px] z-30 animate-in slide-in-from-bottom duration-300 pointer-events-auto"
+          onMouseEnter={() => setShowDeleteButton(true)}
+          onMouseLeave={() => setShowDeleteButton(false)}
+          style={{ maxWidth: 'calc(100% - 292px)' }}
+        >
+          <div className="bg-card/90 backdrop-blur-md border-2 border-destructive/50 rounded-lg shadow-2xl px-3 py-2 relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-destructive/10 to-transparent rounded-lg"></div>
-            <div className="relative z-10 space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">已選擇 {selectedFiles.size} 個項目</p>
-                  <p className="text-lg font-bold text-destructive font-mono">
-                    {formatBytes(getSelectedTotalSize())}
-                  </p>
-                </div>
+            <div className="relative z-10 flex items-center gap-2">
+              {/* Always show size */}
+              <div className="space-y-0">
+                <p className="text-xs text-muted-foreground">已選 {selectedFiles.size} 項</p>
+                <p className="text-base font-bold text-destructive font-mono">
+                  {formatBytes(getSelectedTotalSize())}
+                </p>
+              </div>
+
+              {/* Show delete button on hover */}
+              {showDeleteButton && (
                 <button
                   onClick={handleBatchDelete}
                   disabled={isDeleting}
-                  className="bg-gradient-to-br from-destructive/20 to-destructive/10 backdrop-blur-md rounded-lg border-2 border-destructive/50 px-4 py-2 flex items-center gap-2 hover:from-destructive/30 hover:to-destructive/15 hover:border-destructive/70 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-destructive/20 disabled:opacity-50 disabled:cursor-not-allowed group relative overflow-hidden"
+                  className="bg-gradient-to-br from-destructive/20 to-destructive/10 backdrop-blur-md rounded-lg border-2 border-destructive/50 px-3 py-1.5 flex items-center gap-2 hover:from-destructive/30 hover:to-destructive/15 hover:border-destructive/70 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-destructive/20 disabled:opacity-50 disabled:cursor-not-allowed group relative overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-destructive/10 via-destructive/20 to-destructive/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   {isDeleting ? (
                     <>
                       <Loader2 className="w-4 h-4 text-destructive animate-spin relative z-10" />
-                      <span className="text-sm font-semibold text-destructive relative z-10">刪除中...</span>
+                      <span className="text-xs font-semibold text-destructive relative z-10">刪除中...</span>
                     </>
                   ) : (
                     <>
                       <X className="w-4 h-4 text-destructive relative z-10 group-hover:rotate-90 transition-transform duration-300" />
-                      <span className="text-sm font-semibold text-destructive relative z-10">刪除</span>
+                      <span className="text-xs font-semibold text-destructive relative z-10">刪除</span>
                     </>
                   )}
                 </button>
-              </div>
-              {deletionProgress && (
-                <div className="pt-2 border-t border-border/50 space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">進度</span>
-                    <span className="text-primary font-mono">{deletionProgress.current}/{deletionProgress.total}</span>
-                  </div>
-                  <div className="w-full bg-muted/50 rounded-full h-1.5">
-                    <div
-                      className="bg-destructive h-1.5 rounded-full transition-all duration-300"
-                      style={{ width: `${(deletionProgress.current / deletionProgress.total) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground truncate" title={deletionProgress.currentPath}>
-                    {deletionProgress.currentPath}
-                  </p>
-                </div>
               )}
             </div>
+
+            {/* Deletion progress */}
+            {deletionProgress && (
+              <div className="mt-2 pt-2 border-t border-border/50 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">進度</span>
+                  <span className="text-primary font-mono">{deletionProgress.current}/{deletionProgress.total}</span>
+                </div>
+                <div className="w-full bg-muted/50 rounded-full h-1.5">
+                  <div
+                    className="bg-destructive h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${(deletionProgress.current / deletionProgress.total) * 100}%` }}
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground truncate max-w-[200px]" title={deletionProgress.currentPath}>
+                  {deletionProgress.currentPath}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <Toaster />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>確認刪除</DialogTitle>
+            <DialogDescription>
+              確定要刪除 {selectedFiles.size} 個項目嗎？
+              <br />
+              總大小：{formatBytes(getSelectedTotalSize())}
+              <br />
+              <span className="text-destructive font-semibold">此操作無法撤銷！</span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2">
+            <button
+              onClick={() => setShowDeleteDialog(false)}
+              className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              取消
+            </button>
+            <button
+              onClick={confirmDeletion}
+              className="px-4 py-2 text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-md transition-colors"
+            >
+              確認刪除
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

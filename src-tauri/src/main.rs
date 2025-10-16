@@ -478,10 +478,13 @@ async fn delete_files_batch(paths: Vec<String>, on_progress: Channel<DeletionPro
     std::thread::spawn(move || {
         let mut deleted_count = 0usize;
         let mut deleted_size = 0u64;
+        let mut failed_paths = Vec::new();
 
         for (index, path) in paths.iter().enumerate() {
-            let path_obj = Path::new(path);
-            let current_path = path.clone();
+            // Normalize path separators (replace backslash with forward slash)
+            let normalized_path = path.replace("\\", "/");
+            let path_obj = Path::new(&normalized_path);
+            let current_path = normalized_path.clone();
 
             // Calculate size before deletion
             let size_before = if path_obj.exists() {
@@ -525,16 +528,22 @@ async fn delete_files_batch(paths: Vec<String>, on_progress: Channel<DeletionPro
                 }
                 Err(e) => {
                     eprintln!("❌ Failed to delete {}: {}", current_path, e);
+                    failed_paths.push(current_path);
                 }
             }
         }
 
         // Send completion message
+        let all_success = failed_paths.is_empty();
         let completion = DeletionProgress {
             current: total,
             total,
-            current_path: String::from("完成"),
-            success: true,
+            current_path: if all_success {
+                String::from("完成")
+            } else {
+                format!("完成 ({} 個失敗)", failed_paths.len())
+            },
+            success: all_success,
             completed: true,
             deleted_size: Some(deleted_size),
             deleted_count: Some(deleted_count),

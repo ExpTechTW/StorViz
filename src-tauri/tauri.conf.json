@@ -49,6 +49,7 @@
           "windows": ["*"],
           "permissions": [
             "dialog:allow-open",
+            "dialog:allow-ask",
             "core:default",
             "shell:default",
             "shell:allow-open"
