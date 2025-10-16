@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { BarChart3, FileStack, HardDrive, Trash2, Database } from 'lucide-react'
 import { getStats, type ScanStats } from '@/lib/statsStorage'
 import { useCountAnimation } from '@/hooks/useCountAnimation'
+import { useTranslation } from 'react-i18next'
 
 interface StatCardProps {
   icon: React.ReactNode
@@ -139,6 +140,7 @@ function getBytesUnit(bytes: number): string {
 }
 
 export function StatsDisplay() {
+  const { t } = useTranslation()
   const [stats, setStats] = useState<ScanStats>({
     totalScans: 0,
     totalFiles: 0,
@@ -176,15 +178,15 @@ export function StatsDisplay() {
     <>
       <StatCard
         icon={<BarChart3 className="w-3 h-3" />}
-        label="累計掃描次數"
+        label={t('home.stats.totalScanned')}
         value={stats.totalScans}
-        unit="次"
+        unit={t('home.stats.times')}
         color="#3b82f6"
       />
 
       <StatCard
         icon={<FileStack className="w-3 h-3" />}
-        label="累計掃描檔案"
+        label={t('home.stats.totalFiles')}
         value={stats.totalFiles}
         unit={getCountUnit(stats.totalFiles)}
         formatValue={formatCount}
@@ -193,7 +195,7 @@ export function StatsDisplay() {
 
       <StatCard
         icon={<HardDrive className="w-3 h-3" />}
-        label="累計掃描資料量"
+        label={t('home.stats.totalSize')}
         value={stats.totalSize}
         unit={getBytesUnit(stats.totalSize)}
         formatValue={formatBytes}
@@ -202,7 +204,7 @@ export function StatsDisplay() {
 
       <StatCard
         icon={<Trash2 className="w-3 h-3" />}
-        label="累計刪除檔案"
+        label={t('home.stats.totalDeleted')}
         value={stats.totalDeleted}
         unit={getCountUnit(stats.totalDeleted)}
         formatValue={formatDeletedCount}
@@ -211,7 +213,7 @@ export function StatsDisplay() {
 
       <StatCard
         icon={<Database className="w-3 h-3" />}
-        label="累計釋放空間"
+        label={t('home.stats.totalDeletedSize')}
         value={stats.totalDeletedSize}
         unit={getBytesUnit(stats.totalDeletedSize)}
         formatValue={formatBytes}

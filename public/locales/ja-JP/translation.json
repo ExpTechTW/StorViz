@@ -1,0 +1,127 @@
+{
+  "navigation": {
+    "home": "ホーム",
+    "analyze": "分析"
+  },
+  "home": {
+    "title": "StorViz",
+    "subtitle": "ディスク容量可視化分析ツール",
+    "description": "ディスク容量の使用状況を素早くスキャンし、可視化します。容量を占有しているファイルやフォルダを簡単に見つけられます。",
+    "startAnalysis": "分析開始",
+    "selectFolder": "フォルダを選択",
+    "selectFolderDesc": "分析対象を選択",
+    "selectedPath": "選択されたパス",
+    "analyzing": "分析中...",
+    "processing": "処理中",
+    "executeScan": "スキャン実行",
+    "features": {
+      "visualization": "可視化分析",
+      "visualizationDesc": "直感的な円グラフ表示",
+      "hierarchy": "階層分析",
+      "hierarchyDesc": "多層フォルダ構造",
+      "security": "安全・信頼性",
+      "securityDesc": "ローカル処理でプライバシー保護"
+    },
+    "stats": {
+      "totalScanned": "累計スキャン回数",
+      "totalFiles": "累計スキャンファイル",
+      "totalSize": "累計スキャンデータ量",
+      "totalDeleted": "累計削除ファイル",
+      "totalDeletedSize": "累計解放容量",
+      "times": "回",
+      "files": "個",
+      "size": "サイズ"
+    }
+  },
+  "analyze": {
+    "title": "ディスク分析",
+    "loading": "スキャン中...",
+    "scanning": "スキャン中",
+    "filesScanned": "スキャン済みファイル",
+    "scannedSize": "スキャン済みサイズ",
+    "estimatedTotal": "推定総数",
+    "remainingTime": "残り時間",
+    "scanComplete": "スキャン完了！",
+    "scanSummary": "スキャンサマリー",
+    "totalFilesScanned": "総ファイル数",
+    "totalSizeScanned": "総サイズ",
+    "duration": "継続時間",
+    "close": "閉じる",
+    "deleteConfirmation": {
+      "title": "削除確認",
+      "description": "{{count}}個の項目を削除しますか？",
+      "totalSize": "総サイズ",
+      "irreversibleWarning": "この操作は取り消せません！",
+      "cancel": "キャンセル",
+      "confirmDelete": "削除確認"
+    },
+    "fileList": {
+      "name": "名前",
+      "size": "サイズ",
+      "type": "タイプ",
+      "lastModified": "更新日時",
+      "actions": "操作",
+      "delete": "削除",
+      "open": "開く",
+      "noFilesSelected": "選択されたファイルがありません",
+      "batchDelete": "一括削除"
+    },
+    "labels": {
+      "path": "パス:",
+      "storageDistribution": "ストレージ分布",
+      "filesAndFolders": "ファイルとフォルダ",
+      "sortByName": "名前で並び替え",
+      "sortBySize": "サイズで並び替え",
+      "scanningFolder": "フォルダをスキャン中",
+      "scanProgress": "スキャン進捗",
+      "itemsScanned": "スキャン済み項目",
+      "elapsed": "経過時間",
+      "estimatedRemaining": "推定残り時間",
+      "scanCompleteTitle": "スキャン完了！",
+      "diskInfo": "ディスク情報",
+      "totalCapacity": "総容量",
+      "used": "使用済み",
+      "available": "利用可能",
+      "viewAnalysisResult": "分析結果を見る",
+      "emptyFolder": "空のフォルダ",
+      "cancelScan": "スキャンをキャンセル",
+      "deleting": "削除中..."
+    },
+    "chart": {
+      "availableSpace": "利用可能な容量",
+      "others": "その他 ({{count}}項目)"
+    }
+  },
+  "common": {
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "success": "成功",
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "close": "閉じる",
+    "back": "戻る",
+    "next": "次へ",
+    "previous": "前へ",
+    "save": "保存",
+    "delete": "削除",
+    "edit": "編集",
+    "view": "表示",
+    "refresh": "更新",
+    "search": "検索",
+    "filter": "フィルター",
+    "sort": "並び替え",
+    "selectAll": "すべて選択",
+    "deselectAll": "選択解除"
+  },
+  "fileTypes": {
+    "directory": "フォルダ",
+    "file": "ファイル",
+    "image": "画像",
+    "video": "動画",
+    "audio": "音声",
+    "document": "文書",
+    "archive": "アーカイブ",
+    "code": "コード",
+    "other": "その他"
+  }
+}

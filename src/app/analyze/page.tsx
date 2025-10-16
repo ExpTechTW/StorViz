@@ -10,6 +10,7 @@ import { updateStats, updateDeleteStats } from '@/lib/statsStorage'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
+import { useTranslation } from 'react-i18next'
 
 interface FileNode {
   name: string
@@ -266,6 +267,7 @@ function expandAndAddToMap(compactNode: any, parentPath: string, nodeMap: Map<st
 function AnalyzeContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { t } = useTranslation()
   const path = searchParams.get('path')
 
   const [data, setData] = useState<FileNode | null>(null)
@@ -982,20 +984,20 @@ function AnalyzeContent() {
         const availableAngleRange = 360 * availableProportion
         const availableEndAngle = currentAngle + availableAngleRange
 
-        layers.get(0)!.push({
-          name: '可用空間',
-          value: logicalAvailableSpace,
-          color: 'rgba(128, 128, 128, 0.4)', // Semi-transparent gray
-          path: '',
-          node: {
-            name: '可用空間',
-            size: logicalAvailableSpace,
-            path: '',
-            isDirectory: false
-          },
-          startAngle: currentAngle,
-          endAngle: availableEndAngle,
-        })
+         layers.get(0)!.push({
+           name: t('analyze.chart.availableSpace'),
+           value: logicalAvailableSpace,
+           color: 'rgba(128, 128, 128, 0.4)',
+           path: '__available__',
+           node: {
+             name: t('analyze.chart.availableSpace'),
+             size: logicalAvailableSpace,
+             path: '__available__',
+             isDirectory: false
+           },
+           startAngle: currentAngle,
+           endAngle: availableEndAngle,
+         })
       }
     }
 
@@ -1133,14 +1135,14 @@ function AnalyzeContent() {
   }
 
   const handlePieClick = (entry: ChartData) => {
-    if (!entry.node || entry.name === '可用空間' || entry.path === '__others__') return
+    if (!entry.node || entry.path === '__available__' || entry.path === '__others__') return
     navigateToNode(entry.node)
   }
 
   if (!path) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">未選擇資料夾</p>
+        <p className="text-muted-foreground">{t('analyze.noPathSelected')}</p>
       </div>
     )
   }
@@ -1163,7 +1165,7 @@ function AnalyzeContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-foreground">掃描完成！</h2>
+             <h2 className="text-2xl font-bold text-foreground">{t('analyze.labels.scanCompleteTitle')}</h2>
             <p className="text-muted-foreground">已完成資料夾分析，以下是掃描結果</p>
           </div>
 
@@ -1196,18 +1198,18 @@ function AnalyzeContent() {
             {/* Disk Info */}
             {diskInfo && (
               <div className="pt-4 border-t border-border/50 relative z-10">
-                <p className="text-sm text-muted-foreground mb-3">硬碟資訊</p>
+                 <p className="text-sm text-muted-foreground mb-3">{t('analyze.labels.diskInfo')}</p>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">總容量</span>
+                     <span className="text-sm text-muted-foreground">{t('analyze.labels.totalCapacity')}</span>
                     <span className="text-sm font-mono text-foreground">{formatBytes(diskInfo.totalSpace)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">已使用</span>
+                     <span className="text-sm text-muted-foreground">{t('analyze.labels.used')}</span>
                     <span className="text-sm font-mono text-foreground">{formatBytes(diskInfo.usedSpace)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">可用空間</span>
+                     <span className="text-sm text-muted-foreground">{t('analyze.labels.available')}</span>
                     <span className="text-sm font-mono text-foreground">{formatBytes(diskInfo.availableSpace)}</span>
                   </div>
                   <div className="mt-2">
@@ -1233,7 +1235,7 @@ function AnalyzeContent() {
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <span className="text-base font-semibold text-primary relative z-10">查看分析結果</span>
+                 <span className="text-base font-semibold text-primary relative z-10">{t('analyze.labels.viewAnalysisResult')}</span>
                 <svg className="w-5 h-5 text-primary relative z-10 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
@@ -1272,7 +1274,7 @@ function AnalyzeContent() {
         <div className="w-full max-w-2xl space-y-6 relative z-20">
           <div className="text-center space-y-2">
             <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-            <p className="text-lg font-medium text-foreground">正在掃描資料夾</p>
+             <p className="text-lg font-medium text-foreground">{t('analyze.labels.scanningFolder')}</p>
             <p className="text-sm text-muted-foreground">檔案較多時可能會需要較長時間，請耐心等待</p>
           </div>
 
@@ -1287,7 +1289,7 @@ function AnalyzeContent() {
                 return (
                   <div className="space-y-2 relative z-10">
                     <div className="flex justify-between items-center text-sm mb-2">
-                      <span className="text-muted-foreground">掃描進度</span>
+                       <span className="text-muted-foreground">{t('analyze.labels.scanProgress')}</span>
                       <span className="font-mono text-primary font-semibold">
                         {Math.round(displayPercentage)}%
                       </span>
@@ -1310,7 +1312,7 @@ function AnalyzeContent() {
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 relative z-10">
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">已掃描項目</p>
+                   <p className="text-xs text-muted-foreground">{t('analyze.labels.itemsScanned')}</p>
                   <p className="text-2xl font-bold text-foreground font-mono">
                     {scanProgress.filesScanned.toLocaleString()}
                   </p>
@@ -1326,7 +1328,7 @@ function AnalyzeContent() {
               {/* Time stats */}
               <div className="grid grid-cols-2 gap-4 relative z-10 pt-2 border-t border-border/50">
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">已耗時</p>
+                   <p className="text-xs text-muted-foreground">{t('analyze.labels.elapsed')}</p>
                   <p className="text-xl font-bold text-primary font-mono">
                     {scanCompleteTime ? formatTime(scanCompleteTime) : formatTime(scanElapsedTime)}
                   </p>
@@ -1335,7 +1337,7 @@ function AnalyzeContent() {
                   const remainingTime = calculateRemainingTime()
                   return remainingTime ? (
                     <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">預估剩餘</p>
+                       <p className="text-xs text-muted-foreground">{t('analyze.labels.estimatedRemaining')}</p>
                       <p className="text-xl font-bold text-primary font-mono">
                         {remainingTime}
                       </p>
@@ -1373,14 +1375,14 @@ function AnalyzeContent() {
 
               {/* Cancel button */}
               <div className="pt-4 border-t border-border relative z-10 flex justify-center">
-                <button
-                  onClick={handleCancelScan}
-                  className="bg-gradient-to-br from-destructive/20 to-destructive/10 backdrop-blur-md rounded-lg border-2 border-destructive/50 px-4 py-2 flex items-center gap-2 hover:from-destructive/30 hover:to-destructive/15 hover:border-destructive/70 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-destructive/20 group relative overflow-hidden"
-                >
+             <button
+               onClick={handleCancelScan}
+               className="bg-gradient-to-br from-destructive/20 to-destructive/10 backdrop-blur-md rounded-lg border-2 border-destructive/50 px-4 py-2 flex items-center gap-2 hover:from-destructive/30 hover:to-destructive/15 hover:border-destructive/70 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-destructive/20 group relative overflow-hidden"
+             >
                   <div className="absolute inset-0 bg-gradient-to-r from-destructive/10 via-destructive/20 to-destructive/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   <div className="absolute -inset-1 bg-gradient-to-r from-destructive/30 to-destructive/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   <X className="w-4 h-4 text-destructive relative z-10 group-hover:rotate-90 transition-transform duration-300" />
-                  <span className="text-sm font-semibold text-destructive relative z-10">取消掃描</span>
+               <span className="text-sm font-semibold text-destructive relative z-10">{t('analyze.labels.cancelScan')}</span>
                 </button>
               </div>
             </div>
@@ -1504,7 +1506,7 @@ function AnalyzeContent() {
             className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-all"
           >
             <ArrowLeft className="w-3 h-3" />
-            Home
+             {t('navigation.home')}
           </button>
         </div>
         <h1 className="text-sm font-bold text-foreground">ExpTech Studio</h1>
@@ -1513,7 +1515,7 @@ function AnalyzeContent() {
       {/* Breadcrumb Navigation */}
       <div className="bg-card/60 backdrop-blur-md border-b border-border/50 px-3 py-2 flex-shrink-0 relative z-20">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground font-medium">Path:</span>
+           <span className="text-[10px] text-muted-foreground font-medium">{t('analyze.labels.path')}</span>
           <div className="flex items-center gap-1 flex-1 min-w-0">
             {generateBreadcrumbSegments().map((segment, index) => (
               <div key={index} className="flex items-center gap-1.5">
@@ -1541,9 +1543,9 @@ function AnalyzeContent() {
       <div className="flex-1 grid grid-cols-[1fr_260px] overflow-hidden relative z-20">
         <div className="bg-card/60 backdrop-blur-md border-r border-border/50 p-3 flex flex-col overflow-hidden relative">
           <div className="flex items-center justify-between mb-2 flex-shrink-0">
-            <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+             <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
               <span className="w-0.5 h-3 bg-primary rounded-full"></span>
-              Storage Distribution
+               {t('analyze.labels.storageDistribution')}
             </h2>
             <div className="text-xs font-bold text-foreground truncate max-w-[200px]">
               {currentLevel === data && diskInfo
@@ -1691,17 +1693,17 @@ function AnalyzeContent() {
                   </svg>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
-              Empty folder
+             <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
+               {t('analyze.labels.emptyFolder')}
             </div>
           )}
         </div>
 
         <div className="bg-card/60 backdrop-blur-md p-3 flex flex-col overflow-hidden">
           <div className="flex items-center justify-between mb-2 flex-shrink-0">
-            <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+             <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
               <span className="w-0.5 h-3 bg-primary rounded-full"></span>
-              Files & Folders ({listData.length})
+               {t('analyze.labels.filesAndFolders')} ({listData.length})
             </h2>
             <div className="flex items-center gap-1">
               <button
@@ -1711,7 +1713,7 @@ function AnalyzeContent() {
                     ? 'bg-primary/20 text-primary border border-primary/40'
                     : 'bg-muted/50 text-muted-foreground hover:bg-muted/80'
                 }`}
-                title="按名稱排序"
+                 title={t('analyze.labels.sortByName')}
               >
                 名稱
                 {sortBy === 'name' && (
@@ -1725,7 +1727,7 @@ function AnalyzeContent() {
                     ? 'bg-primary/20 text-primary border border-primary/40'
                     : 'bg-muted/50 text-muted-foreground hover:bg-muted/80'
                 }`}
-                title="按大小排序"
+                 title={t('analyze.labels.sortBySize')}
               >
                 大小
                 {sortBy === 'size' && (

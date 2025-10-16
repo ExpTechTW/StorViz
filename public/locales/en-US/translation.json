@@ -1,0 +1,127 @@
+{
+  "navigation": {
+    "home": "Home",
+    "analyze": "Analyze"
+  },
+  "home": {
+    "title": "StorViz",
+    "subtitle": "Disk Space Visualization Analysis Tool",
+    "description": "Quickly scan and visualize your disk space usage, easily find files and folders that are taking up space.",
+    "startAnalysis": "Start Analysis",
+    "selectFolder": "Select Folder",
+    "selectFolderDesc": "Choose analysis target",
+    "selectedPath": "Selected Path",
+    "analyzing": "Analyzing...",
+    "processing": "Processing",
+    "executeScan": "Execute Scan",
+    "features": {
+      "visualization": "Visualization Analysis",
+      "visualizationDesc": "Intuitive pie chart display",
+      "hierarchy": "Hierarchy Analysis",
+      "hierarchyDesc": "Multi-layer folder structure",
+      "security": "Secure & Reliable",
+      "securityDesc": "Local processing protects privacy"
+    },
+    "stats": {
+      "totalScanned": "Total Scans",
+      "totalFiles": "Total Files Scanned",
+      "totalSize": "Total Data Scanned",
+      "totalDeleted": "Total Files Deleted",
+      "totalDeletedSize": "Total Space Freed",
+      "times": "times",
+      "files": "files",
+      "size": "size"
+    }
+  },
+  "analyze": {
+    "title": "Disk Analysis",
+    "loading": "Scanning...",
+    "scanning": "Scanning",
+    "filesScanned": "Files Scanned",
+    "scannedSize": "Scanned Size",
+    "estimatedTotal": "Estimated Total",
+    "remainingTime": "Remaining Time",
+    "scanComplete": "Scan Complete!",
+    "scanSummary": "Scan Summary",
+    "totalFilesScanned": "Total Files",
+    "totalSizeScanned": "Total Size",
+    "duration": "Duration",
+    "close": "Close",
+    "deleteConfirmation": {
+      "title": "Confirm Delete",
+      "description": "Are you sure you want to delete {{count}} items?",
+      "totalSize": "Total Size",
+      "irreversibleWarning": "This action cannot be undone!",
+      "cancel": "Cancel",
+      "confirmDelete": "Confirm Delete"
+    },
+    "fileList": {
+      "name": "Name",
+      "size": "Size",
+      "type": "Type",
+      "lastModified": "Modified",
+      "actions": "Actions",
+      "delete": "Delete",
+      "open": "Open",
+      "noFilesSelected": "No files selected",
+      "batchDelete": "Batch Delete"
+    },
+    "labels": {
+      "path": "Path:",
+      "storageDistribution": "Storage Distribution",
+      "filesAndFolders": "Files & Folders",
+      "sortByName": "Sort by name",
+      "sortBySize": "Sort by size",
+      "scanningFolder": "Scanning folder",
+      "scanProgress": "Scan progress",
+      "itemsScanned": "Items scanned",
+      "elapsed": "Elapsed",
+      "estimatedRemaining": "Estimated remaining",
+      "scanCompleteTitle": "Scan complete!",
+      "diskInfo": "Disk info",
+      "totalCapacity": "Total capacity",
+      "used": "Used",
+      "available": "Available",
+      "viewAnalysisResult": "View analysis",
+      "emptyFolder": "Empty folder",
+      "cancelScan": "Cancel scan",
+      "deleting": "Deleting..."
+    },
+    "chart": {
+      "availableSpace": "Available Space",
+      "others": "Others ({{count}} items)"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "refresh": "Refresh",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All"
+  },
+  "fileTypes": {
+    "directory": "Directory",
+    "file": "File",
+    "image": "Image",
+    "video": "Video",
+    "audio": "Audio",
+    "document": "Document",
+    "archive": "Archive",
+    "code": "Code",
+    "other": "Other"
+  }
+}

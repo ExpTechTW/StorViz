@@ -7,6 +7,8 @@ import { join, resourceDir } from '@tauri-apps/api/path'
 import { convertFileSrc, isTauri } from '@tauri-apps/api/core'
 import { FolderOpen, HardDrive, BarChart3, Shield, Eye, Layers, ArrowLeft } from 'lucide-react'
 import { StatsDisplay } from '@/components/StatsDisplay'
+import { useTranslation } from 'react-i18next'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 // Feature card component
 interface FeatureCardProps {
@@ -34,6 +36,7 @@ function FeatureCard({ icon, title, description }: FeatureCardProps) {
 
 export default function HomePage() {
   const router = useRouter()
+  const { t } = useTranslation()
   const [selectedPath, setSelectedPath] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
@@ -61,9 +64,9 @@ export default function HomePage() {
 
   // Feature data
   const features = [
-    { icon: <Eye className="w-3 h-3 text-primary" />, title: '視覺化分析', description: '直觀的圓餅圖顯示' },
-    { icon: <Layers className="w-3 h-3 text-primary" />, title: '層次分析', description: '多層資料夾結構' },
-    { icon: <Shield className="w-3 h-3 text-primary" />, title: '安全可靠', description: '本地處理保護隱私' }
+    { icon: <Eye className="w-3 h-3 text-primary" />, title: t('home.features.visualization'), description: t('home.features.visualizationDesc') },
+    { icon: <Layers className="w-3 h-3 text-primary" />, title: t('home.features.hierarchy'), description: t('home.features.hierarchyDesc') },
+    { icon: <Shield className="w-3 h-3 text-primary" />, title: t('home.features.security'), description: t('home.features.securityDesc') }
   ]
 
   // Mouse tracking for cursor glow effect
@@ -83,7 +86,6 @@ export default function HomePage() {
       if (animationFrame) cancelAnimationFrame(animationFrame)
     }
   }, [])
-
 
   // Audio playback helper (Tauri only)
   const playAudio = async (audioFileName: string) => {
@@ -137,6 +139,11 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 flex items-center justify-center relative overflow-hidden">
+      {/* Language Switcher */}
+      <div className="absolute top-4 right-4 z-20">
+        <LanguageSwitcher />
+      </div>
+
       {/* Background Tech Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-primary/5 rounded-full blur-3xl animate-pulse"></div>
@@ -171,10 +178,10 @@ export default function HomePage() {
           </div>
           <div className="space-y-2">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-              StorViz
+              {t('home.title')}
             </h1>
             <p className="text-sm text-muted-foreground">
-              強大的儲存空間視覺化工具
+              {t('home.subtitle')}
             </p>
           </div>
         </div>
@@ -199,8 +206,8 @@ export default function HomePage() {
                   <FolderOpen className="w-4 h-4 text-primary-foreground drop-shadow-lg" />
                 </div>
                 <div className="relative z-10">
-                  <h3 className="text-sm font-bold text-foreground mb-1 group-hover:text-primary transition-colors">瀏覽資料夾</h3>
-                  <p className="text-[10px] text-muted-foreground group-hover:text-foreground/80 transition-colors">選擇分析目標</p>
+                  <h3 className="text-sm font-bold text-foreground mb-1 group-hover:text-primary transition-colors">{t('home.selectFolder')}</h3>
+                  <p className="text-[10px] text-muted-foreground group-hover:text-foreground/80 transition-colors">{t('home.selectFolderDesc')}</p>
                 </div>
               </button>
 
@@ -224,7 +231,7 @@ export default function HomePage() {
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   <div className="relative z-10 flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider mb-1">已選擇路徑</h3>
+                      <h3 className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider mb-1">{t('home.selectedPath')}</h3>
                       <p className="text-[11px] text-foreground font-mono leading-relaxed truncate" title={selectedPath}>{getDisplayPath(selectedPath)}</p>
                     </div>
                     <button
@@ -256,10 +263,10 @@ export default function HomePage() {
                   </div>
                   <div className="relative z-10">
                     <h3 className="text-sm font-bold text-foreground mb-1 group-hover:text-primary transition-colors">
-                      {isLoading ? '分析中...' : '開始分析'}
+                      {isLoading ? t('home.analyzing') : t('home.startAnalysis')}
                     </h3>
                     <p className="text-[10px] text-muted-foreground group-hover:text-foreground/80 transition-colors">
-                      {isLoading ? '處理中' : '執行掃描'}
+                      {isLoading ? t('home.processing') : t('home.executeScan')}
                     </p>
                   </div>
                 </button>
