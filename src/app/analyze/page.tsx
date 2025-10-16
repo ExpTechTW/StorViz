@@ -1002,7 +1002,7 @@ function AnalyzeContent() {
     // Convert map to array of layers
     const result: LayerData[] = []
     layers.forEach((data, depth) => {
-      const innerRadius = 40 + (depth * layerThickness)
+      const innerRadius = 50 + (depth * layerThickness)
       const outerRadius = innerRadius + layerThickness - 2
 
       result.push({
@@ -1559,7 +1559,7 @@ function AnalyzeContent() {
                 key={currentLevel?.path || 'root'}
                 width="100%"
                 height="100%"
-                viewBox="0 0 500 500"
+                viewBox="0 0 400 400"
                 className="chart-container max-h-full transition-all duration-500 ease-in-out"
                 style={{
                   opacity: 1,
@@ -1569,8 +1569,8 @@ function AnalyzeContent() {
               >
                     {/* Center size display */}
                     <text
-                      x="250"
-                      y="245"
+                      x="200"
+                      y="195"
                       textAnchor="middle"
                       dominantBaseline="middle"
                       className="fill-foreground transition-all duration-300"
@@ -1579,8 +1579,8 @@ function AnalyzeContent() {
                       {formatBytesCompact(currentLevel?.size || 0).split(' ')[0]}
                     </text>
                     <text
-                      x="250"
-                      y="265"
+                      x="200"
+                      y="215"
                       textAnchor="middle"
                       dominantBaseline="middle"
                       className="fill-muted-foreground transition-all duration-300"
@@ -1589,8 +1589,8 @@ function AnalyzeContent() {
                       {formatBytesCompact(currentLevel?.size || 0).split(' ')[1]}
                     </text>
                     {layers.map((layer, layerIndex) => {
-                      const centerX = 250
-                      const centerY = 250
+                      const centerX = 200
+                      const centerY = 200
 
                       return (
                         <g key={`layer-${layerIndex}`}>
