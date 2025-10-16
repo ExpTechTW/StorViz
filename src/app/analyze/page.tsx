@@ -54,6 +54,17 @@ function generateSectorId(path: string, depth: number): string {
   return Math.abs(hash).toString(16)
 }
 
+// Hash function for consistent color assignment based on name
+function hashName(name: string): number {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    const char = name.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // Convert to 32bit integer
+  }
+  return Math.abs(hash)
+}
+
 // Color schemes for each folder - same folder uses same color family
 const COLOR_SCHEMES = [
   ['#1e40af', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'], // Blue
@@ -736,9 +747,10 @@ function AnalyzeContent() {
           return
         }
 
-        // Get color for this node
+        // Get color for this node - use same color scheme as parent but lighter for deeper levels
         const colorScheme = COLOR_SCHEMES[parentColorIndex % COLOR_SCHEMES.length]
-        const color = colorScheme[Math.min(depth, colorScheme.length - 1)]
+        const colorIndex = Math.min(depth, colorScheme.length - 1)
+        const color = colorScheme[colorIndex]
 
         // Add to current layer
         if (!layers.has(depth)) {
@@ -809,7 +821,10 @@ function AnalyzeContent() {
         const nodeAngleRange = 360 * proportion
         const nodeEndAngle = currentAngle + nodeAngleRange
 
-        const colorScheme = COLOR_SCHEMES[index % COLOR_SCHEMES.length]
+        // Use name hash for consistent color assignment
+        const nameHash = hashName(node.name)
+        const colorSchemeIndex = nameHash % COLOR_SCHEMES.length
+        const colorScheme = COLOR_SCHEMES[colorSchemeIndex]
         const color = colorScheme[0]
 
         if (!layers.has(0)) {
@@ -828,7 +843,7 @@ function AnalyzeContent() {
 
         // Process children
         if (node.isDirectory && node.children && node.children.length > 0) {
-          buildHierarchy(node.children, 1, currentAngle, nodeEndAngle, index)
+          buildHierarchy(node.children, 1, currentAngle, nodeEndAngle, colorSchemeIndex)
         }
 
         currentAngle = nodeEndAngle
@@ -964,10 +979,16 @@ function AnalyzeContent() {
       const nodeAngleRange = 360 * proportion
       const isTinyNode = nodeAngleRange < 1
 
+      // Use same color assignment logic as pie chart for consistency
+      const nameHash = hashName(child.name)
+      const colorSchemeIndex = nameHash % COLOR_SCHEMES.length
+      const colorScheme = COLOR_SCHEMES[colorSchemeIndex]
+      const color = colorScheme[0] // Use the darkest color from the scheme
+
       return {
         name: child.name,
         value: child.size,
-        color: COLORS[index % COLORS.length],
+        color: color,
         path: child.path,
         node: child,
         isTinyNode, // Mark if this should be grouped in "其他"
