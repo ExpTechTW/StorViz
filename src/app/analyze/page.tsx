@@ -423,6 +423,13 @@ function AnalyzeContent() {
               const updatedCurrentLevel = findNodePath(updatedTree, currentLevel.path)
               if (updatedCurrentLevel) {
                 setCurrentLevel(updatedCurrentLevel[updatedCurrentLevel.length - 1])
+                
+                // Update breadcrumb with updated nodes
+                const updatedBreadcrumb = breadcrumb.map(breadcrumbNode => {
+                  const updatedBreadcrumbPath = findNodePath(updatedTree, breadcrumbNode.path)
+                  return updatedBreadcrumbPath ? updatedBreadcrumbPath[updatedBreadcrumbPath.length - 1] : breadcrumbNode
+                })
+                setBreadcrumb(updatedBreadcrumb)
               }
             }
           }
