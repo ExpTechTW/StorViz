@@ -21,7 +21,8 @@
     "resources": ["audios/*"],
     "macOS": {
       "minimumSystemVersion": "10.13",
-      "entitlements": "Entitlements.plist"
+      "entitlements": "Entitlements.plist",
+      "signingIdentity": "Developer ID Application: ExpTech (98Q7JARYZF)"
     }
   },
   "app": {
