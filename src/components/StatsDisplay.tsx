@@ -58,22 +58,44 @@ function formatToFiveDigits(value: number): string {
   return value.toFixed(4)
 }
 
-// 格式化檔案數量
+// 格式化檔案數量（智能小數點處理）
 function formatCount(count: number): string {
-  if (count === 0) return '0.000'
+  if (count === 0) return '0'
 
   // 億個 (100,000,000+)
   if (count >= 100000000) {
-    return formatToFiveDigits(count / 100000000)
+    const value = count / 100000000
+    return value % 1 === 0 ? value.toString() : value.toFixed(1)
   }
 
   // 萬個 (10,000+)
   if (count >= 10000) {
-    return formatToFiveDigits(count / 10000)
+    const value = count / 10000
+    return value % 1 === 0 ? value.toString() : value.toFixed(1)
   }
 
   // 個 (<10,000)
-  return formatToFiveDigits(count)
+  return count.toString()
+}
+
+// 格式化刪除檔案數量（智能小數點處理）
+function formatDeletedCount(count: number): string {
+  if (count === 0) return '0'
+
+  // 億個 (100,000,000+)
+  if (count >= 100000000) {
+    const value = count / 100000000
+    return value % 1 === 0 ? value.toString() : value.toFixed(1)
+  }
+
+  // 萬個 (10,000+)
+  if (count >= 10000) {
+    const value = count / 10000
+    return value % 1 === 0 ? value.toString() : value.toFixed(1)
+  }
+
+  // 個 (<10,000)
+  return count.toString()
 }
 
 // 獲取檔案數量單位
@@ -156,6 +178,7 @@ export function StatsDisplay() {
         icon={<BarChart3 className="w-3 h-3" />}
         label="累計掃描次數"
         value={stats.totalScans}
+        unit="次"
         color="#3b82f6"
       />
 
@@ -182,7 +205,7 @@ export function StatsDisplay() {
         label="累計刪除檔案"
         value={stats.totalDeleted}
         unit={getCountUnit(stats.totalDeleted)}
-        formatValue={formatCount}
+        formatValue={formatDeletedCount}
         color="#f59e0b"
       />
 
