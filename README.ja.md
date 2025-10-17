@@ -53,7 +53,10 @@ StorViz は、ストレージの使用状況を素早く把握できる強力な
 <tr>
 <td width="33%" valign="top">
 
-**インストール手順：**
+<details>
+<summary><b>インストール手順</b></summary>
+
+<br>
 
 1. **ファイルダウンロード**：上のボタンをクリックして `.app.tar.gz` ファイルをダウンロード
 2. **展開**：ダウンロードしたファイルをダブルクリック、macOS が自動展開
@@ -62,14 +65,21 @@ StorViz は、ストレージの使用状況を素早く把握できる強力な
 
 > **💡 ヒント**：「開発元を確認できません」の警告が表示された場合、「システム環境設定」→「セキュリティとプライバシー」で実行を許可してください。
 
+</details>
+
 **最低システム要件：**
-- macOS 10.13 以上
-- Intel または Apple Silicon (M1/M2/M3)
+
+- macOS 10.13 (High Sierra) 以上
+- macOS 11 (Big Sur) 以上（推奨）
+- Intel (x86_64) / Apple Silicon (ARM64) アーキテクチャ
 
 </td>
 <td width="33%" valign="top">
 
-**インストール手順：**
+<details>
+<summary><b>インストール手順</b></summary>
+
+<br>
 
 1. **ファイルダウンロード**：上のボタンをクリックして `.exe` インストーラーをダウンロード
 2. **インストーラー実行**：ダウンロードしたインストーラーをダブルクリック
@@ -78,15 +88,22 @@ StorViz は、ストレージの使用状況を素早く把握できる強力な
 
 > **💡 ヒント**：Windows Defender が警告を表示した場合、「詳細情報」→「実行」を選択してください。
 
+</details>
+
 **最低システム要件：**
+
 - Windows 7 SP1 以上
-- x64 (64-bit)
-- WebView2 ランタイム（自動インストール）
+- Windows 10 以上（推奨）
+- x64 (64-bit) アーキテクチャ
+- WebView2 ランタイム（インストーラーが自動的にインストール）
 
 </td>
 <td width="33%" valign="top">
 
-**インストール手順：**
+<details>
+<summary><b>インストール手順</b></summary>
+
+<br>
 
 1. **ファイルダウンロード**：上のボタンをクリックして `.AppImage` ファイルをダウンロード
 2. **権限設定**：ターミナルを開いて以下を実行：
@@ -100,10 +117,38 @@ StorViz は、ストレージの使用状況を素早く把握できる強力な
 
 > **💡 ヒント**：AppImage はインストール不要で実行できるポータブルアプリケーションです。
 
+</details>
+
 **最低システム要件：**
-- Ubuntu 22.04+ / Debian 12+
-- Fedora 36+ / CentOS 9+
+
+- Ubuntu 22.04 (Jammy) 以上
+- Debian 12 (Bookworm) 以上
+- Fedora 36 以上
+- Rocky Linux / AlmaLinux 9 以上
 - Arch Linux（ローリングリリース）
+- x64 (64-bit) アーキテクチャ
+
+<details>
+<summary><b>オーディオ再生サポート</b></summary>
+
+<br>
+
+AppImage には GStreamer オーディオサポートが組み込まれており、直接オーディオを再生できます。
+
+オーディオ再生に問題が発生した場合は、GStreamer パッケージをインストールしてください：
+
+```bash
+# Ubuntu/Debian
+sudo apt install gstreamer1.0-plugins-good gstreamer1.0-libav
+
+# Fedora
+sudo dnf install gstreamer1-plugins-good gstreamer1-libav
+
+# Arch Linux
+sudo pacman -S gst-plugins-good gst-libav
+```
+
+</details>
 
 </td>
 </tr>
@@ -111,21 +156,99 @@ StorViz は、ストレージの使用状況を素早く把握できる強力な
 
 ## 📋 サポート対象 OS バージョン
 
-<div align="center">
+<details>
+<summary><h3>🍎 macOS</h3></summary>
 
-| OS | 最低バージョン | 推奨バージョン | リリース日 |
-|----|-------------|--------------|-----------|
-| **macOS** | 10.13 (High Sierra) | 12.0+ (Monterey) | 2017年9月 |
-| **Windows** | Windows 7 SP1 | Windows 10/11 | 2011年2月 |
-| **Ubuntu** | 22.04 LTS (Jammy) | 24.04 LTS (Noble) | 2022年4月 |
-| **Debian** | 12 (Bookworm) | 13 (Trixie) | 2023年6月 |
-| **Fedora** | 36 | 最新版 | 2022年5月 |
-| **Rocky Linux / AlmaLinux** | 9 | 9 | 2022年7月 |
-| **Arch Linux** | ローリングリリース | ローリングリリース | - |
+| OS バージョン | StorViz バージョン | 状態 |
+| ------------ | ------------ | ---- |
+| **10.9 Mavericks** | `1.0.0-rc.3` | ❌ |
+| **10.10 Yosemite** | `1.0.0-rc.3` | ❌ |
+| **10.11 El Capitan** | `1.0.0-rc.3` | ❌ |
+| **10.12 Sierra** | `1.0.0-rc.3` | ❌ |
+| **10.13 High Sierra** | `1.0.0-rc.3` | ✅ |
+| **10.14 Mojave** | `1.0.0-rc.3` | ✅ |
+| **10.15 Catalina** | `1.0.0-rc.3` | ✅ |
+| **11 Big Sur** | `1.0.0-rc.3` | ✅ |
+| **12 Monterey** | `1.0.0-rc.3` | ✅ |
+| **13 Ventura** | `1.0.0-rc.3` | ✅ |
+| **14 Sonoma** | `1.0.0-rc.3` | ✅ |
+| **15 Sequoia** | `1.0.0-rc.3` | ✅ |
 
-</div>
+**アーキテクチャサポート：** Intel (x86_64) / Apple Silicon (ARM64)
 
-> **⚠️ 注意**：Linux 版は新しいシステムライブラリが必要です。Ubuntu 20.04 と Debian 11 のユーザーは、新しいバージョンへのアップグレードを推奨します。
+</details>
+
+<details>
+<summary><h3>🪟 Windows</h3></summary>
+
+| OS バージョン | StorViz バージョン | 状態 |
+| ------------ | ------------ | ---- |
+| **XP** | `1.0.0-rc.3` | ❌ |
+| **Vista** | `1.0.0-rc.3` | ❌ |
+| **7** | `1.0.0-rc.3` | ❌ |
+| **7 SP1** | `1.0.0-rc.3` | ✅ |
+| **8** | `1.0.0-rc.3` | ✅ |
+| **8.1** | `1.0.0-rc.3` | ✅ |
+| **10** | `1.0.0-rc.3` | ✅ |
+| **11** | `1.0.0-rc.3` | ✅ |
+
+**アーキテクチャサポート：** x64 (64-bit)
+**追加要件：** WebView2 ランタイム（インストーラーが自動的にインストール）
+
+</details>
+
+<details>
+<summary><h3>🐧 Linux</h3></summary>
+
+#### Ubuntu
+
+| OS バージョン | StorViz バージョン | 状態 |
+| ------------ | ------------ | ---- |
+| **18.04 LTS Bionic** | `1.0.0-rc.3` | ❌ |
+| **20.04 LTS Focal** | `1.0.0-rc.3` | ❌ |
+| **22.04 LTS Jammy** | `1.0.0-rc.3` | ✅ |
+| **23.10 Mantic** | `1.0.0-rc.3` | ✅ |
+| **24.04 LTS Noble** | `1.0.0-rc.3` | ✅ |
+| **24.10 Oracular** | `1.0.0-rc.3` | ✅ |
+
+#### Debian
+
+| OS バージョン | StorViz バージョン | 状態 |
+| ------------ | ------------ | ---- |
+| **10 Buster** | `1.0.0-rc.3` | ❌ |
+| **11 Bullseye** | `1.0.0-rc.3` | ❌ |
+| **12 Bookworm** | `1.0.0-rc.3` | ✅ |
+| **13 Trixie** | `1.0.0-rc.3` | ✅ |
+
+#### Fedora
+
+| OS バージョン | StorViz バージョン | 状態 |
+| ------------ | ------------ | ---- |
+| **34** | `1.0.0-rc.3` | ❌ |
+| **35** | `1.0.0-rc.3` | ❌ |
+| **36** | `1.0.0-rc.3` | ✅ |
+| **37+** | `1.0.0-rc.3` | ✅ |
+
+#### Red Hat Enterprise Linux (RHEL) / Rocky Linux / AlmaLinux
+
+| OS バージョン | StorViz バージョン | 状態 |
+| ------------ | ------------ | ---- |
+| **7** | `1.0.0-rc.3` | ❌ |
+| **8** | `1.0.0-rc.3` | ❌ |
+| **9** | `1.0.0-rc.3` | ✅ |
+
+#### Arch Linux
+
+| OS バージョン | StorViz バージョン | 状態 |
+| ------------ | ------------ | ---- |
+| **ローリングリリース** | `1.0.0-rc.3` | ✅ |
+
+**アーキテクチャサポート：** x64 (64-bit)
+**追加要件：** GLib >= 2.70、WebKitGTK 4.1
+
+> **⚠️ 注意**：Linux 版は新しいシステムライブラリ（GLIBC 2.35+）が必要です。Ubuntu 20.04 と Debian 11 のユーザーは、新しいバージョンへのアップグレードを推奨します。
+
+</details>
 
 ## ✨ 主な機能
 
