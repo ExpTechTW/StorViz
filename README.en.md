@@ -91,15 +91,15 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
 
 <br>
 
-| OS Version                    | StorViz Version | Status |
-| ----------------------------- | --------------- | ------ |
-| **10.15 Catalina and below**  | `-`             | ❌     |
-| **11 Big Sur**                | `-`             | ❔     |
-| **12 Monterey**               | `-`             | ❔     |
-| **13 Ventura**                | `-`             | ❔     |
-| **14 Sonoma**                 | `-`             | ❔     |
-| **15 Sequoia**                | `-`             | ❔     |
-| **26 Tahoe**                  | `1.0.0-rc.3`    | ✅     |
+| OS Version                   | StorViz Version | Status |
+| ---------------------------- | --------------- | ------ |
+| **10.15 Catalina and below** | `-`             | ❌     |
+| **11 Big Sur**               | `-`             | ❔     |
+| **12 Monterey**              | `-`             | ❔     |
+| **13 Ventura**               | `-`             | ❔     |
+| **14 Sonoma**                | `1.0.0-rc.3`    | ✅     |
+| **15 Sequoia**               | `1.0.0-rc.3`    | ✅     |
+| **26 Tahoe**                 | `1.0.0-rc.3`    | ✅     |
 
 **Architecture Support**: Intel (x86_64) / Apple Silicon (ARM64)
 
@@ -112,15 +112,19 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
 
 <br>
 
-| OS Version       | StorViz Version | Status |
-| ---------------- | --------------- | ------ |
-| **8 and below**  | `-`             | ❌     |
-| **8.1**          | `-`             | ❔     |
-| **10**           | `1.0.0-rc.3`    | ✅     |
-| **11**           | `1.0.0-rc.3`    | ✅     |
+| OS Version      | StorViz Version | Status |
+| --------------- | --------------- | ------ |
+| **8 and below** | `-`             | ❌     |
+| **8.1**         | `1.0.0-rc.3`    | ⚠️     |
+| **10**          | `1.0.0-rc.3`    | ✅     |
+| **11**          | `1.0.0-rc.3`    | ✅     |
 
 **Architecture Support**: x64 (64-bit)
 **Additional Requirements**: WebView2 Runtime (automatically installed by the installer)
+
+> **⚠️ Note**
+>
+> Windows 8.1 requires NET4.8 to be installed, and dark mode may not work properly.
 
 </details>
 
@@ -133,21 +137,21 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
 
 **Ubuntu**
 
-| OS Version                      | StorViz Version | Status |
-| ------------------------------- | --------------- | ------ |
-| **20.04 LTS Focal and below**   | `-`             | ❌     |
-| **22.04 LTS Jammy**             | `1.0.0-rc.3`    | ✅     |
-| **23.10 Mantic**                | `1.0.0-rc.3`    | ✅     |
-| **24.04 LTS Noble**             | `1.0.0-rc.3`    | ✅     |
-| **24.10 Oracular**              | `1.0.0-rc.3`    | ✅     |
+| OS Version                    | StorViz Version | Status |
+| ----------------------------- | --------------- | ------ |
+| **20.04 LTS Focal and below** | `-`             | ❌     |
+| **22.04 LTS Jammy**           | `1.0.0-rc.3`    | ✅     |
+| **23.10 Mantic**              | `1.0.0-rc.3`    | ✅     |
+| **24.04 LTS Noble**           | `1.0.0-rc.3`    | ✅     |
+| **24.10 Oracular**            | `1.0.0-rc.3`    | ✅     |
 
 **Debian**
 
-| OS Version                  | StorViz Version | Status |
-| --------------------------- | --------------- | ------ |
-| **11 Bullseye and below**   | `-`             | ❌     |
-| **12 Bookworm**             | `1.0.0-rc.3`    | ✅     |
-| **13 Trixie**               | `1.0.0-rc.3`    | ✅     |
+| OS Version                | StorViz Version | Status |
+| ------------------------- | --------------- | ------ |
+| **11 Bullseye and below** | `-`             | ❌     |
+| **12 Bookworm**           | `1.0.0-rc.3`    | ✅     |
+| **13 Trixie**             | `1.0.0-rc.3`    | ✅     |
 
 **Fedora**
 
