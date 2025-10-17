@@ -24,16 +24,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: "./src-tauri -> target"
-
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -44,10 +34,24 @@ jobs:
         run: |
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+          # Include platform-specific cache key
+          key: ${{ matrix.platform }}-${{ matrix.args }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Cache Bun dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.bun/install/cache
+          path: |
+            ~/.bun/install/cache
+            node_modules
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
           restore-keys: |
             ${{ runner.os }}-bun-
@@ -58,11 +62,14 @@ jobs:
       - name: Build frontend
         run: bun run build
 
+      - name: Disable updater artifacts for CI
+        run: |
+          # Temporarily disable createUpdaterArtifacts for CI builds
+          if [[ "${{ matrix.platform }}" == "macos-latest" ]]; then
+            sed -i '' 's/"createUpdaterArtifacts": true/"createUpdaterArtifacts": false/' src-tauri/tauri.conf.json
+          else
+            sed -i 's/"createUpdaterArtifacts": true/"createUpdaterArtifacts": false/' src-tauri/tauri.conf.json
+          fi
+
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ""
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-        with:
-          args: ${{ matrix.args }}
+        run: bun tauri build ${{ matrix.args }}
