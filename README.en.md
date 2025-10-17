@@ -53,10 +53,7 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
 <tr>
 <td width="33%" valign="top">
 
-<details>
-<summary><b>Installation Steps</b></summary>
-
-<br>
+**Installation Steps:**
 
 1. **Download File**: Click the button above to download the `.app.tar.gz` file
 2. **Extract**: Double-click the downloaded file, macOS will auto-extract it
@@ -65,21 +62,10 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
 
 > **💡 Tip**: If you see a "Cannot verify developer" warning, go to "System Preferences" → "Security & Privacy" to allow execution.
 
-</details>
-
-**Minimum Requirements:**
-
-- macOS 10.13 (High Sierra) or higher
-- macOS 11 (Big Sur) or higher (recommended)
-- Intel (x86_64) / Apple Silicon (ARM64) architecture
-
 </td>
 <td width="33%" valign="top">
 
-<details>
-<summary><b>Installation Steps</b></summary>
-
-<br>
+**Installation Steps:**
 
 1. **Download File**: Click the button above to download the `.exe` installer
 2. **Run Installer**: Double-click the downloaded installer
@@ -88,22 +74,10 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
 
 > **💡 Tip**: If Windows Defender shows a warning, select "More info" → "Run anyway".
 
-</details>
-
-**Minimum Requirements:**
-
-- Windows 7 SP1 or higher
-- Windows 10 or higher (recommended)
-- x64 (64-bit) architecture
-- WebView2 Runtime (automatically installed by the installer)
-
 </td>
 <td width="33%" valign="top">
 
-<details>
-<summary><b>Installation Steps</b></summary>
-
-<br>
+**Installation Steps:**
 
 1. **Download File**: Click the button above to download the `.AppImage` file
 2. **Set Permission**: Open terminal and run:
@@ -117,39 +91,6 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
 
 > **💡 Tip**: AppImage is a portable application that runs without installation.
 
-</details>
-
-**Minimum Requirements:**
-
-- Ubuntu 22.04 (Jammy) or higher
-- Debian 12 (Bookworm) or higher
-- Fedora 36 or higher
-- Rocky Linux / AlmaLinux 9 or higher
-- Arch Linux (rolling release)
-- x64 (64-bit) architecture
-
-<details>
-<summary><b>Audio Playback Support</b></summary>
-
-<br>
-
-The AppImage includes built-in GStreamer audio support for direct audio playback.
-
-If you encounter audio playback issues, please install GStreamer packages:
-
-```bash
-# Ubuntu/Debian
-sudo apt install gstreamer1.0-plugins-good gstreamer1.0-libav
-
-# Fedora
-sudo dnf install gstreamer1-plugins-good gstreamer1-libav
-
-# Arch Linux
-sudo pacman -S gst-plugins-good gst-libav
-```
-
-</details>
-
 </td>
 </tr>
 </table>
@@ -159,20 +100,18 @@ sudo pacman -S gst-plugins-good gst-libav
 <details>
 <summary><h3>🍎 macOS</h3></summary>
 
-| Operating System Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **10.9 Mavericks** | `1.0.0-rc.3` | ❌ |
-| **10.10 Yosemite** | `1.0.0-rc.3` | ❌ |
-| **10.11 El Capitan** | `1.0.0-rc.3` | ❌ |
-| **10.12 Sierra** | `1.0.0-rc.3` | ❌ |
-| **10.13 High Sierra** | `1.0.0-rc.3` | ✅ |
-| **10.14 Mojave** | `1.0.0-rc.3` | ✅ |
-| **10.15 Catalina** | `1.0.0-rc.3` | ✅ |
-| **11 Big Sur** | `1.0.0-rc.3` | ✅ |
-| **12 Monterey** | `1.0.0-rc.3` | ✅ |
-| **13 Ventura** | `1.0.0-rc.3` | ✅ |
-| **14 Sonoma** | `1.0.0-rc.3` | ✅ |
-| **15 Sequoia** | `1.0.0-rc.3` | ✅ |
+| Operating System Version     | StorViz Version | Status |
+| ---------------------------- | --------------- | ------ |
+| **10.12 Sierra (and below)** | `1.0.0-rc.3`    | ❌     |
+| **10.13 High Sierra**        | `1.0.0-rc.3`    | ❔     |
+| **10.14 Mojave**             | `1.0.0-rc.3`    | ❔     |
+| **10.15 Catalina**           | `1.0.0-rc.3`    | ❔     |
+| **11 Big Sur**               | `1.0.0-rc.3`    | ❔     |
+| **12 Monterey**              | `1.0.0-rc.3`    | ❔     |
+| **13 Ventura**               | `1.0.0-rc.3`    | ❔     |
+| **14 Sonoma**                | `1.0.0-rc.3`    | ❔     |
+| **15 Sequoia**               | `1.0.0-rc.3`    | ❔     |
+| **26 Tahoe**                 | `1.0.0-rc.3`    | ✅     |
 
 **Architecture Support:** Intel (x86_64) / Apple Silicon (ARM64)
 
@@ -182,15 +121,15 @@ sudo pacman -S gst-plugins-good gst-libav
 <summary><h3>🪟 Windows</h3></summary>
 
 | Operating System Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **XP** | `1.0.0-rc.3` | ❌ |
-| **Vista** | `1.0.0-rc.3` | ❌ |
-| **7** | `1.0.0-rc.3` | ❌ |
-| **7 SP1** | `1.0.0-rc.3` | ✅ |
-| **8** | `1.0.0-rc.3` | ✅ |
-| **8.1** | `1.0.0-rc.3` | ✅ |
-| **10** | `1.0.0-rc.3` | ✅ |
-| **11** | `1.0.0-rc.3` | ✅ |
+| ------------------------ | --------------- | ------ |
+| **XP**                   | `1.0.0-rc.3`    | ❌     |
+| **Vista**                | `1.0.0-rc.3`    | ❌     |
+| **7**                    | `1.0.0-rc.3`    | ❔     |
+| **7 SP1**                | `1.0.0-rc.3`    | ❔     |
+| **8**                    | `1.0.0-rc.3`    | ❔     |
+| **8.1**                  | `1.0.0-rc.3`    | ❔     |
+| **10**                   | `1.0.0-rc.3`    | ✅     |
+| **11**                   | `1.0.0-rc.3`    | ✅     |
 
 **Architecture Support:** x64 (64-bit)
 **Additional Requirements:** WebView2 Runtime (automatically installed by the installer)
@@ -203,45 +142,45 @@ sudo pacman -S gst-plugins-good gst-libav
 #### Ubuntu
 
 | Operating System Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **18.04 LTS Bionic** | `1.0.0-rc.3` | ❌ |
-| **20.04 LTS Focal** | `1.0.0-rc.3` | ❌ |
-| **22.04 LTS Jammy** | `1.0.0-rc.3` | ✅ |
-| **23.10 Mantic** | `1.0.0-rc.3` | ✅ |
-| **24.04 LTS Noble** | `1.0.0-rc.3` | ✅ |
-| **24.10 Oracular** | `1.0.0-rc.3` | ✅ |
+| ------------------------ | --------------- | ------ |
+| **18.04 LTS Bionic**     | `1.0.0-rc.3`    | ❌     |
+| **20.04 LTS Focal**      | `1.0.0-rc.3`    | ❌     |
+| **22.04 LTS Jammy**      | `1.0.0-rc.3`    | ✅     |
+| **23.10 Mantic**         | `1.0.0-rc.3`    | ✅     |
+| **24.04 LTS Noble**      | `1.0.0-rc.3`    | ✅     |
+| **24.10 Oracular**       | `1.0.0-rc.3`    | ✅     |
 
 #### Debian
 
 | Operating System Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **10 Buster** | `1.0.0-rc.3` | ❌ |
-| **11 Bullseye** | `1.0.0-rc.3` | ❌ |
-| **12 Bookworm** | `1.0.0-rc.3` | ✅ |
-| **13 Trixie** | `1.0.0-rc.3` | ✅ |
+| ------------------------ | --------------- | ------ |
+| **10 Buster**            | `1.0.0-rc.3`    | ❌     |
+| **11 Bullseye**          | `1.0.0-rc.3`    | ❌     |
+| **12 Bookworm**          | `1.0.0-rc.3`    | ✅     |
+| **13 Trixie**            | `1.0.0-rc.3`    | ✅     |
 
 #### Fedora
 
 | Operating System Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **34** | `1.0.0-rc.3` | ❌ |
-| **35** | `1.0.0-rc.3` | ❌ |
-| **36** | `1.0.0-rc.3` | ✅ |
-| **37+** | `1.0.0-rc.3` | ✅ |
+| ------------------------ | --------------- | ------ |
+| **34**                   | `1.0.0-rc.3`    | ❌     |
+| **35**                   | `1.0.0-rc.3`    | ❌     |
+| **36**                   | `1.0.0-rc.3`    | ❔     |
+| **37**                   | `1.0.0-rc.3`    | ❔     |
 
 #### Red Hat Enterprise Linux (RHEL) / Rocky Linux / AlmaLinux
 
 | Operating System Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **7** | `1.0.0-rc.3` | ❌ |
-| **8** | `1.0.0-rc.3` | ❌ |
-| **9** | `1.0.0-rc.3` | ✅ |
+| ------------------------ | --------------- | ------ |
+| **7**                    | `1.0.0-rc.3`    | ❌     |
+| **8**                    | `1.0.0-rc.3`    | ❌     |
+| **9**                    | `1.0.0-rc.3`    | ❔     |
 
 #### Arch Linux
 
 | Operating System Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **Rolling Release** | `1.0.0-rc.3` | ✅ |
+| ------------------------ | --------------- | ------ |
+| **Rolling Release**      | `1.0.0-rc.3`    | ❌     |
 
 **Architecture Support:** x64 (64-bit)
 **Additional Requirements:** GLib >= 2.70, WebKitGTK 4.1
