@@ -27,8 +27,7 @@
     },
     "linux": {
       "appimage": {
-        "bundleMediaFramework": true,
-        "files": {}
+        "bundleMediaFramework": true
       }
     }
   },
