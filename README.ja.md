@@ -2,7 +2,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
 [![Version](https://img.shields.io/badge/version-1.0.0--rc.3-green.svg)](https://github.com/ExpTechTW/StorViz/releases)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/ExpTechTW/StorViz/releases)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/ExpTechTW/StorViz/releases)
 [![Build Status](https://github.com/ExpTechTW/StorViz/workflows/CI%20Build%20Check/badge.svg)](https://github.com/ExpTechTW/StorViz/actions)
 [![Stars](https://img.shields.io/github/stars/ExpTechTW/StorViz?style=social)](https://github.com/ExpTechTW/StorViz)
 
@@ -26,6 +26,7 @@ StorViz は、ストレージの使用状況を素早く把握できる強力な
 
 [![Download for macOS](https://img.shields.io/badge/Download-macOS-black?style=for-the-badge&logo=apple)](https://github.com/ExpTechTW/StorViz/releases/latest/download/StorViz_universal.app.tar.gz)
 [![Download for Windows](https://img.shields.io/badge/Download-Windows-blue?style=for-the-badge&logo=windows)](https://github.com/ExpTechTW/StorViz/releases/latest/download/StorViz_1.0.0-rc.3_x64-setup.exe)
+[![Download for Linux](https://img.shields.io/badge/Download-Linux-orange?style=for-the-badge&logo=linux)](https://github.com/ExpTechTW/StorViz/releases/latest/download/storviz_1.0.0-rc.3_amd64.AppImage)
 
 </div>
 
@@ -33,19 +34,24 @@ StorViz は、ストレージの使用状況を素早く把握できる強力な
 
 <table>
 <tr>
-<td width="50%" align="center">
+<td width="33%" align="center">
 
 ### 🍎 macOS
 
 </td>
-<td width="50%" align="center">
+<td width="33%" align="center">
 
 ### 🪟 Windows
 
 </td>
+<td width="33%" align="center">
+
+### 🐧 Linux
+
+</td>
 </tr>
 <tr>
-<td width="50%" valign="top">
+<td width="33%" valign="top">
 
 **インストール手順：**
 
@@ -56,14 +62,12 @@ StorViz は、ストレージの使用状況を素早く把握できる強力な
 
 > **💡 ヒント**：「開発元を確認できません」の警告が表示された場合、「システム環境設定」→「セキュリティとプライバシー」で実行を許可してください。
 
-**システム要件：**
+**最低システム要件：**
 - macOS 10.13 以上
 - Intel または Apple Silicon (M1/M2/M3)
-- 最低 4GB RAM
-- 最低 100MB の空き容量
 
 </td>
-<td width="50%" valign="top">
+<td width="33%" valign="top">
 
 **インストール手順：**
 
@@ -74,15 +78,54 @@ StorViz は、ストレージの使用状況を素早く把握できる強力な
 
 > **💡 ヒント**：Windows Defender が警告を表示した場合、「詳細情報」→「実行」を選択してください。
 
-**システム要件：**
-- Windows 10 以上
+**最低システム要件：**
+- Windows 7 SP1 以上
 - x64 (64-bit)
-- 最低 4GB RAM
-- 最低 100MB の空き容量
+- WebView2 ランタイム（自動インストール）
+
+</td>
+<td width="33%" valign="top">
+
+**インストール手順：**
+
+1. **ファイルダウンロード**：上のボタンをクリックして `.AppImage` ファイルをダウンロード
+2. **権限設定**：ターミナルを開いて以下を実行：
+   ```bash
+   chmod +x storviz_*.AppImage
+   ```
+3. **実行**：ダブルクリックで実行、またはターミナルで実行：
+   ```bash
+   ./storviz_*.AppImage
+   ```
+
+> **💡 ヒント**：AppImage はインストール不要で実行できるポータブルアプリケーションです。
+
+**最低システム要件：**
+- Ubuntu 22.04+ / Debian 12+
+- Fedora 36+ / CentOS 9+
+- Arch Linux（ローリングリリース）
 
 </td>
 </tr>
 </table>
+
+## 📋 サポート対象 OS バージョン
+
+<div align="center">
+
+| OS | 最低バージョン | 推奨バージョン | リリース日 |
+|----|-------------|--------------|-----------|
+| **macOS** | 10.13 (High Sierra) | 12.0+ (Monterey) | 2017年9月 |
+| **Windows** | Windows 7 SP1 | Windows 10/11 | 2011年2月 |
+| **Ubuntu** | 22.04 LTS (Jammy) | 24.04 LTS (Noble) | 2022年4月 |
+| **Debian** | 12 (Bookworm) | 13 (Trixie) | 2023年6月 |
+| **Fedora** | 36 | 最新版 | 2022年5月 |
+| **Rocky Linux / AlmaLinux** | 9 | 9 | 2022年7月 |
+| **Arch Linux** | ローリングリリース | ローリングリリース | - |
+
+</div>
+
+> **⚠️ 注意**：Linux 版は新しいシステムライブラリが必要です。Ubuntu 20.04 と Debian 11 のユーザーは、新しいバージョンへのアップグレードを推奨します。
 
 ## ✨ 主な機能
 
@@ -91,7 +134,7 @@ StorViz は、ストレージの使用状況を素早く把握できる強力な
 - 📁 **ファイルタイプ統計**：ファイルタイプと拡張子による詳細なストレージ分析
 - 🌍 **多言語対応**：英語、繁体字中国語、日本語に対応
 - 🌓 **ダークモード**：美しいダーク/ライトテーマの切り替え
-- 💻 **クロスプラットフォーム**：macOS と Windows で動作
+- 💻 **クロスプラットフォーム**：macOS、Windows、Linux で動作
 
 ## 📸 スクリーンショット
 
