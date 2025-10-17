@@ -18,6 +18,8 @@ jobs:
             args: "--target universal-apple-darwin"
           - platform: "windows-latest"
             args: ""
+          - platform: "ubuntu-22.04"
+            args: ""
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -33,6 +35,12 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install dependencies (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
