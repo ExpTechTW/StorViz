@@ -59,11 +59,9 @@ jobs:
             ${{ runner.os }}-bun-
 
       - name: Install frontend dependencies
-        if: matrix.platform != 'ubuntu-22.04'
         run: bun install
 
       - name: Build frontend
-        if: matrix.platform != 'ubuntu-22.04'
         run: bun run build
 
       - name: Import Code-Signing Certificates (macOS)
@@ -75,31 +73,18 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
-      - name: Build Tauri app (Linux) using Docker
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xvfb
+
+      - name: Build Tauri app (Linux)
         if: matrix.platform == 'ubuntu-22.04'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          docker run --rm \
-            -v $(pwd):/workspace \
-            -w /workspace \
-            -e TAURI_SIGNING_PRIVATE_KEY \
-            -e TAURI_SIGNING_PRIVATE_KEY_PASSWORD \
-            ubuntu:20.04 bash -c "
-              set -e
-              export DEBIAN_FRONTEND=noninteractive
-              apt-get update
-              apt-get install -y curl wget unzip libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2t64 xvfb pkg-config libglib2.0-dev
-              curl -fsSL https://bun.sh/install | bash
-              export PATH=\$HOME/.bun/bin:\$PATH
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-              . \$HOME/.cargo/env
-              cargo install tauri-cli --version ^2.0.0 --locked
-              bun install
-              bun run build
-              xvfb-run --auto-servernum cargo tauri build --bundles appimage
-            "
+        run: xvfb-run --auto-servernum bun tauri build --bundles appimage
 
       - name: Build Tauri app (macOS/Windows)
         if: matrix.platform != 'ubuntu-22.04'
