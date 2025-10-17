@@ -91,18 +91,18 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
 
 <br>
 
-| OS Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **10.12 Sierra and below** | `-` | ❌ |
-| **10.13 High Sierra** | `-` | ❔ |
-| **10.14 Mojave** | `-` | ❔ |
-| **10.15 Catalina** | `-` | ❔ |
-| **11 Big Sur** | `-` | ❔ |
-| **12 Monterey** | `-` | ❔ |
-| **13 Ventura** | `-` | ❔ |
-| **14 Sonoma** | `-` | ❔ |
-| **15 Sequoia** | `-` | ❔ |
-| **26 Tahoe** | `1.0.0-rc.3` | ✅ |
+| OS Version                 | StorViz Version | Status |
+| -------------------------- | --------------- | ------ |
+| **10.12 Sierra and below** | `-`             | ❌     |
+| **10.13 High Sierra**      | `-`             | ❔     |
+| **10.14 Mojave**           | `-`             | ❔     |
+| **10.15 Catalina**         | `-`             | ❔     |
+| **11 Big Sur**             | `-`             | ❔     |
+| **12 Monterey**            | `-`             | ❔     |
+| **13 Ventura**             | `-`             | ❔     |
+| **14 Sonoma**              | `-`             | ❔     |
+| **15 Sequoia**             | `-`             | ❔     |
+| **26 Tahoe**               | `1.0.0-rc.3`    | ✅     |
 
 **Architecture Support**: Intel (x86_64) / Apple Silicon (ARM64)
 
@@ -116,15 +116,15 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
 <br>
 
 | OS Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **XP** | `-` | ❌ |
-| **Vista** | `-` | ❌ |
-| **7** | `-` | ❔ |
-| **7 SP1** | `-` | ❔ |
-| **8** | `-` | ❔ |
-| **8.1** | `-` | ❔ |
-| **10** | `1.0.0-rc.3` | ✅ |
-| **11** | `1.0.0-rc.3` | ✅ |
+| ---------- | --------------- | ------ |
+| **XP**     | `-`             | ❌     |
+| **Vista**  | `-`             | ❌     |
+| **7**      | `-`             | ❔     |
+| **7 SP1**  | `-`             | ❔     |
+| **8**      | `-`             | ❔     |
+| **8.1**    | `-`             | ❔     |
+| **10**     | `1.0.0-rc.3`    | ✅     |
+| **11**     | `1.0.0-rc.3`    | ✅     |
 
 **Architecture Support**: x64 (64-bit)
 **Additional Requirements**: WebView2 Runtime (automatically installed by the installer)
@@ -140,51 +140,52 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
 
 **Ubuntu**
 
-| OS Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **18.04 LTS Bionic** | `-` | ❌ |
-| **20.04 LTS Focal** | `-` | ❌ |
-| **22.04 LTS Jammy** | `1.0.0-rc.3` | ✅ |
-| **23.10 Mantic** | `1.0.0-rc.3` | ✅ |
-| **24.04 LTS Noble** | `1.0.0-rc.3` | ✅ |
-| **24.10 Oracular** | `1.0.0-rc.3` | ✅ |
+| OS Version           | StorViz Version | Status |
+| -------------------- | --------------- | ------ |
+| **18.04 LTS Bionic** | `-`             | ❌     |
+| **20.04 LTS Focal**  | `-`             | ❌     |
+| **22.04 LTS Jammy**  | `1.0.0-rc.3`    | ✅     |
+| **23.10 Mantic**     | `1.0.0-rc.3`    | ✅     |
+| **24.04 LTS Noble**  | `1.0.0-rc.3`    | ✅     |
+| **24.10 Oracular**   | `1.0.0-rc.3`    | ✅     |
 
 **Debian**
 
-| OS Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **10 Buster** | `-` | ❌ |
-| **11 Bullseye** | `-` | ❌ |
-| **12 Bookworm** | `1.0.0-rc.3` | ✅ |
-| **13 Trixie** | `1.0.0-rc.3` | ✅ |
+| OS Version      | StorViz Version | Status |
+| --------------- | --------------- | ------ |
+| **10 Buster**   | `-`             | ❌     |
+| **11 Bullseye** | `-`             | ❌     |
+| **12 Bookworm** | `1.0.0-rc.3`    | ✅     |
+| **13 Trixie**   | `1.0.0-rc.3`    | ✅     |
 
 **Fedora**
 
 | OS Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **34** | `-` | ❌ |
-| **35** | `-` | ❌ |
-| **36** | `-` | ❔ |
-| **37+** | `-` | ❔ |
+| ---------- | --------------- | ------ |
+| **34**     | `-`             | ❌     |
+| **35**     | `-`             | ❌     |
+| **36**     | `-`             | ❔     |
+| **37+**    | `-`             | ❔     |
 
 **RHEL / Rocky Linux / AlmaLinux**
 
 | OS Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **7** | `-` | ❌ |
-| **8** | `-` | ❌ |
-| **9** | `-` | ❔ |
+| ---------- | --------------- | ------ |
+| **7**      | `-`             | ❌     |
+| **8**      | `-`             | ❌     |
+| **9**      | `-`             | ❔     |
 
 **Arch Linux**
 
-| OS Version | StorViz Version | Status |
-| ------------ | ------------ | ---- |
-| **Rolling Release** | `-` | ❌ |
+| OS Version          | StorViz Version | Status |
+| ------------------- | --------------- | ------ |
+| **Rolling Release** | `-`             | ❌     |
 
 **Architecture Support**: x64 (64-bit)
 **Additional Requirements**: GLib >= 2.70, WebKitGTK 4.1
 
 > **⚠️ Note**
+>
 > Linux version requires newer system libraries (GLIBC 2.35+).
 > Users on Ubuntu 20.04 and Debian 11 are recommended to upgrade to newer versions.
 
