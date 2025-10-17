@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  [繁體中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+  <a href="README.md">繁體中文</a> | <a href="README.en.md">English</a> | <a href="README.ja.md">日本語</a>
 </p>
 
 ---
@@ -31,14 +31,25 @@ StorViz 是一款功能強大的磁碟空間分析工具，幫助您快速了解
 
 ### 安裝步驟
 
-<details open>
-<summary><strong>🍎 macOS 安裝指南</strong></summary>
+<table>
+<tr>
+<td width="50%" align="center">
 
-<br>
+### 🍎 macOS
+
+</td>
+<td width="50%" align="center">
+
+### 🪟 Windows
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
 
 **安裝步驟：**
 
-1. **下載檔案**：點擊上方「Download for macOS」按鈕下載 `.app.tar.gz` 檔案
+1. **下載檔案**：點擊上方按鈕下載 `.app.tar.gz` 檔案
 2. **解壓縮**：雙擊下載的檔案，macOS 會自動解壓縮
 3. **安裝**：將 `StorViz.app` 拖拽到 Applications 資料夾
 4. **啟動**：在 Applications 中雙擊 StorViz 圖示啟動應用程式
@@ -46,21 +57,17 @@ StorViz 是一款功能強大的磁碟空間分析工具，幫助您快速了解
 > **💡 提示**：如果出現「無法驗證開發者」的警告，請在「系統偏好設定」→「安全性與隱私」中允許執行。
 
 **系統需求：**
-- **作業系統**：macOS 10.13 或更高版本
-- **處理器**：Intel 或 Apple Silicon (M1/M2/M3)
-- **記憶體**：至少 4GB RAM
-- **儲存空間**：至少 100MB 可用空間
+- macOS 10.13 或更高版本
+- Intel 或 Apple Silicon (M1/M2/M3)
+- 至少 4GB RAM
+- 至少 100MB 可用空間
 
-</details>
-
-<details>
-<summary><strong>🪟 Windows 安裝指南</strong></summary>
-
-<br>
+</td>
+<td width="50%" valign="top">
 
 **安裝步驟：**
 
-1. **下載檔案**：點擊上方「Download for Windows」按鈕下載 `.exe` 安裝程式
+1. **下載檔案**：點擊上方按鈕下載 `.exe` 安裝程式
 2. **執行安裝**：雙擊下載的安裝程式
 3. **安裝精靈**：按照安裝精靈的指示完成安裝
 4. **啟動**：從開始選單或桌面捷徑啟動 StorViz
@@ -68,12 +75,14 @@ StorViz 是一款功能強大的磁碟空間分析工具，幫助您快速了解
 > **💡 提示**：如果 Windows Defender 顯示警告，請選擇「更多資訊」→「仍要執行」。
 
 **系統需求：**
-- **作業系統**：Windows 10 或更高版本
-- **架構**：x64 (64-bit)
-- **記憶體**：至少 4GB RAM
-- **儲存空間**：至少 100MB 可用空間
+- Windows 10 或更高版本
+- x64 (64-bit)
+- 至少 4GB RAM
+- 至少 100MB 可用空間
 
-</details>
+</td>
+</tr>
+</table>
 
 ## ✨ 功能特色
 

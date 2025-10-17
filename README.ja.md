@@ -6,9 +6,17 @@
 [![Build Status](https://github.com/ExpTechTW/StorViz/workflows/CI%20Build%20Check/badge.svg)](https://github.com/ExpTechTW/StorViz/actions)
 [![Stars](https://img.shields.io/github/stars/ExpTechTW/StorViz?style=social)](https://github.com/ExpTechTW/StorViz)
 
-[繁體中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+<p align="center">
+  <strong>モダンなストレージ容量視覚化・分析ツール</strong>
+</p>
 
-モダンなストレージ容量視覚化・分析ツールです。
+<p align="center">
+  <a href="README.md">繁體中文</a> | <a href="README.en.md">English</a> | <a href="README.ja.md">日本語</a>
+</p>
+
+---
+
+StorViz は、ストレージの使用状況を素早く把握できる強力なディスク容量分析ツールです。直感的なビジュアルインターフェースで、容量を占めているファイルやフォルダを簡単に特定し、ストレージ管理を最適化できます。
 
 ## 📥 ダウンロードとインストール
 
@@ -23,105 +31,125 @@
 
 ### インストール手順
 
-<div style="margin: 20px 0;">
-  <div style="display: flex; border-bottom: 2px solid var(--color-border-default); margin-bottom: 20px;">
-    <button onclick="showTab('macos')" id="macos-tab" style="flex: 1; padding: 12px 20px; border: none; background: var(--color-accent-emphasis); color: var(--color-fg-on-emphasis); cursor: pointer; font-size: 16px; font-weight: bold; border-radius: 8px 8px 0 0; margin-right: 5px;">🍎 macOS</button>
-    <button onclick="showTab('windows')" id="windows-tab" style="flex: 1; padding: 12px 20px; border: none; background: var(--color-btn-bg); color: var(--color-fg-default); cursor: pointer; font-size: 16px; font-weight: bold; border-radius: 8px 8px 0 0; margin-left: 5px;">🪟 Windows</button>
-  </div>
-  
-  <div id="macos-content" style="display: block; padding: 20px; background: var(--color-canvas-subtle); border-radius: 0 0 8px 8px; border: 1px solid var(--color-border-default);">
-    <h4 style="margin-top: 0; color: var(--color-fg-default);">macOS インストール手順</h4>
-    <ol style="line-height: 1.6; color: var(--color-fg-default);">
-      <li><strong>ファイルダウンロード</strong>：上の「Download for macOS」ボタンをクリックして <code style="background: var(--color-neutral-muted); color: var(--color-fg-default); padding: 2px 6px; border-radius: 4px;">.app.tar.gz</code> ファイルをダウンロード</li>
-      <li><strong>展開</strong>：ダウンロードしたファイルをダブルクリック、macOS が自動展開</li>
-      <li><strong>インストール</strong>：<code style="background: var(--color-neutral-muted); color: var(--color-fg-default); padding: 2px 6px; border-radius: 4px;">StorViz.app</code> を Applications フォルダにドラッグ</li>
-      <li><strong>起動</strong>：Applications で StorViz アイコンをダブルクリックしてアプリを起動</li>
-    </ol>
-    <div style="background: var(--color-accent-subtle); padding: 15px; border-radius: 6px; margin-top: 15px; border-left: 4px solid var(--color-accent-emphasis);">
-      <strong style="color: var(--color-fg-default);">💡 ヒント</strong><span style="color: var(--color-fg-muted);">：「開発元を確認できません」の警告が表示された場合、「システム環境設定」→「セキュリティとプライバシー」で実行を許可してください。</span>
-    </div>
-    
-    <h4 style="margin-top: 20px; color: var(--color-fg-default);">macOS システム要件</h4>
-    <ul style="color: var(--color-fg-default);">
-      <li><strong>オペレーティングシステム</strong>：macOS 10.13 以上</li>
-      <li><strong>プロセッサ</strong>：Intel または Apple Silicon (M1/M2)</li>
-      <li><strong>メモリ</strong>：最低 4GB RAM</li>
-      <li><strong>ストレージ</strong>：最低 100MB の空き容量</li>
-    </ul>
-  </div>
-  
-  <div id="windows-content" style="display: none; padding: 20px; background: var(--color-canvas-subtle); border-radius: 0 0 8px 8px; border: 1px solid var(--color-border-default);">
-    <h4 style="margin-top: 0; color: var(--color-fg-default);">Windows インストール手順</h4>
-    <ol style="line-height: 1.6; color: var(--color-fg-default);">
-      <li><strong>ファイルダウンロード</strong>：上の「Download for Windows」ボタンをクリックして <code style="background: var(--color-neutral-muted); color: var(--color-fg-default); padding: 2px 6px; border-radius: 4px;">.exe</code> インストーラーをダウンロード</li>
-      <li><strong>インストーラー実行</strong>：ダウンロードしたインストーラーをダブルクリック</li>
-      <li><strong>インストールウィザード</strong>：インストールウィザードの指示に従う</li>
-      <li><strong>起動</strong>：スタートメニューまたはデスクトップショートカットから StorViz を起動</li>
-    </ol>
-    <div style="background: var(--color-success-subtle); padding: 15px; border-radius: 6px; margin-top: 15px; border-left: 4px solid var(--color-success-emphasis);">
-      <strong style="color: var(--color-fg-default);">💡 ヒント</strong><span style="color: var(--color-fg-muted);">：Windows Defender が警告を表示した場合、「詳細情報」→「実行」を選択してください。</span>
-    </div>
-    
-    <h4 style="margin-top: 20px; color: var(--color-fg-default);">Windows システム要件</h4>
-    <ul style="color: var(--color-fg-default);">
-      <li><strong>オペレーティングシステム</strong>：Windows 10 以上</li>
-      <li><strong>アーキテクチャ</strong>：x64 (64-bit)</li>
-      <li><strong>メモリ</strong>：最低 4GB RAM</li>
-      <li><strong>ストレージ</strong>：最低 100MB の空き容量</li>
-    </ul>
-  </div>
-</div>
+<table>
+<tr>
+<td width="50%" align="center">
 
-<script>
-function showTab(tabName) {
-  // すべてのコンテンツを非表示
-  document.getElementById('macos-content').style.display = 'none';
-  document.getElementById('windows-content').style.display = 'none';
-  
-  // すべてのボタンスタイルをリセット
-  document.getElementById('macos-tab').style.background = 'var(--color-btn-bg)';
-  document.getElementById('macos-tab').style.color = 'var(--color-fg-default)';
-  document.getElementById('windows-tab').style.background = 'var(--color-btn-bg)';
-  document.getElementById('windows-tab').style.color = 'var(--color-fg-default)';
-  
-  // 選択されたコンテンツを表示
-  document.getElementById(tabName + '-content').style.display = 'block';
-  
-  // 選択されたボタンをハイライト
-  document.getElementById(tabName + '-tab').style.background = 'var(--color-accent-emphasis)';
-  document.getElementById(tabName + '-tab').style.color = 'var(--color-fg-on-emphasis)';
-}
-</script>
+### 🍎 macOS
 
-## 主な機能
+</td>
+<td width="50%" align="center">
 
-- **ビジュアルストレージ分析**：インタラクティブなチャートによる直感的なディスク使用状況の可視化
-- **高速スキャン**：並列処理を使用した Rust バックエンドによる高性能なディレクトリスキャン
-- **ファイルタイプ統計**：ファイルタイプと拡張子による詳細なストレージ分析
-- **多言語対応**：英語、繁体字中国語、日本語に対応
-- **ダークモード**：美しいダーク/ライトテーマの切り替え
-- **クロスプラットフォーム**：macOS と Windows で動作
+### 🪟 Windows
 
-## スクリーンショット
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**インストール手順：**
+
+1. **ファイルダウンロード**：上のボタンをクリックして `.app.tar.gz` ファイルをダウンロード
+2. **展開**：ダウンロードしたファイルをダブルクリック、macOS が自動展開
+3. **インストール**：`StorViz.app` を Applications フォルダにドラッグ
+4. **起動**：Applications で StorViz アイコンをダブルクリックしてアプリを起動
+
+> **💡 ヒント**：「開発元を確認できません」の警告が表示された場合、「システム環境設定」→「セキュリティとプライバシー」で実行を許可してください。
+
+**システム要件：**
+- macOS 10.13 以上
+- Intel または Apple Silicon (M1/M2/M3)
+- 最低 4GB RAM
+- 最低 100MB の空き容量
+
+</td>
+<td width="50%" valign="top">
+
+**インストール手順：**
+
+1. **ファイルダウンロード**：上のボタンをクリックして `.exe` インストーラーをダウンロード
+2. **インストーラー実行**：ダウンロードしたインストーラーをダブルクリック
+3. **インストールウィザード**：インストールウィザードの指示に従う
+4. **起動**：スタートメニューまたはデスクトップショートカットから StorViz を起動
+
+> **💡 ヒント**：Windows Defender が警告を表示した場合、「詳細情報」→「実行」を選択してください。
+
+**システム要件：**
+- Windows 10 以上
+- x64 (64-bit)
+- 最低 4GB RAM
+- 最低 100MB の空き容量
+
+</td>
+</tr>
+</table>
+
+## ✨ 主な機能
+
+- 📊 **ビジュアルストレージ分析**：インタラクティブなチャートによる直感的なディスク使用状況の可視化
+- ⚡ **高速スキャン**：並列処理を使用した Rust バックエンドによる高性能なディレクトリスキャン
+- 📁 **ファイルタイプ統計**：ファイルタイプと拡張子による詳細なストレージ分析
+- 🌍 **多言語対応**：英語、繁体字中国語、日本語に対応
+- 🌓 **ダークモード**：美しいダーク/ライトテーマの切り替え
+- 💻 **クロスプラットフォーム**：macOS と Windows で動作
+
+## 📸 スクリーンショット
 
 <div align="center">
 
-<img src="images/zh/image1.png" alt="メインインターフェース" width="45%" style="margin: 5px;">
-<img src="images/zh/image2.png" alt="ファイルタイプ統計" width="45%" style="margin: 5px;">
-
-<img src="images/zh/image3.png" alt="ディレクトリ構造" width="45%" style="margin: 5px;">
-<img src="images/zh/image4.png" alt="ダークモード" width="45%" style="margin: 5px;">
-
-<img src="images/zh/image5.png" alt="多言語サポート" width="45%" style="margin: 5px;">
-<img src="images/zh/image6.png" alt="高度な分析" width="45%" style="margin: 5px;">
+<table>
+  <tr>
+    <td width="50%">
+      <img src="images/zh/image1.png" alt="メインインターフェース" />
+      <p align="center"><em>メインインターフェース</em></p>
+    </td>
+    <td width="50%">
+      <img src="images/zh/image2.png" alt="ファイルタイプ統計" />
+      <p align="center"><em>ファイルタイプ統計</em></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="images/zh/image3.png" alt="ディレクトリ構造" />
+      <p align="center"><em>ディレクトリ構造</em></p>
+    </td>
+    <td width="50%">
+      <img src="images/zh/image4.png" alt="ダークモード" />
+      <p align="center"><em>ダークモード</em></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="images/zh/image5.png" alt="多言語サポート" />
+      <p align="center"><em>多言語サポート</em></p>
+    </td>
+    <td width="50%">
+      <img src="images/zh/image6.png" alt="高度な分析" />
+      <p align="center"><em>高度な分析</em></p>
+    </td>
+  </tr>
+</table>
 
 </div>
 
-## ライセンス
+## 📄 ライセンス
 
-このプロジェクトはオープンソースであり、AGPL-3.0 ライセンスの下で利用可能です。
+このプロジェクトはオープンソースであり、[AGPL-3.0](LICENSE) ライセンスの下で利用可能です。
 
-## コントリビューション
+## 🤝 コントリビューション
 
-- コントリビューションを歓迎します！プルリクエストをお気軽に送信してください。
-  <a href="https://github.com/exptechtw/StorViz/graphs/contributors"><img src="https://contrib.rocks/image?repo=exptechtw/StorViz" ></a>
+コントリビューションを歓迎します！このプロジェクトに貢献したい方は、プルリクエストの送信または Issue の作成をお気軽にどうぞ。
+
+### コントリビューター
+
+このプロジェクトに貢献してくださったすべての開発者に感謝します！
+
+<a href="https://github.com/exptechtw/StorViz/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=exptechtw/StorViz" alt="Contributors" />
+</a>
+
+---
+
+<p align="center">
+  このプロジェクトがお役に立ちましたら、⭐️ Star をお願いします！
+</p>
