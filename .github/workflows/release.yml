@@ -39,7 +39,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: "./src-tauri -> target"
           # Include platform-specific cache key
           key: ${{ matrix.platform }}-${{ matrix.args }}
 
@@ -111,7 +111,7 @@ jobs:
               set -e
               export DEBIAN_FRONTEND=noninteractive
               apt-get update
-              apt-get install -y curl wget unzip libwebkit2gtk-4.0-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2 xvfb pkg-config
+              apt-get install -y curl wget unzip libwebkit2gtk-4.0-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2 xvfb pkg-config libglib2.0-dev
               curl -fsSL https://bun.sh/install | bash
               export PATH=\$HOME/.bun/bin:\$PATH
               curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
