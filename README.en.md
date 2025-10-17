@@ -32,160 +32,161 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
 
 ### Installation Steps
 
-<table>
-<tr>
-<td width="33%" align="center">
+<details>
+<summary>🍎 macOS - View Installation Steps</summary>
 
-### 🍎 macOS
+<br>
 
-</td>
-<td width="33%" align="center">
+1. **Download File** - Click the button above to download the `.app.tar.gz` file
+2. **Extract** - Double-click the downloaded file, macOS will auto-extract it
+3. **Install** - Drag `StorViz.app` to the Applications folder
+4. **Launch** - Double-click the StorViz icon in Applications to start the app
 
-### 🪟 Windows
+> **💡 Tip**
+> If you see a "Cannot verify developer" warning, go to "System Preferences" → "Security & Privacy" to allow execution.
 
-</td>
-<td width="33%" align="center">
+</details>
 
-### 🐧 Linux
+<details>
+<summary>🪟 Windows - View Installation Steps</summary>
 
-</td>
-</tr>
-<tr>
-<td width="33%" valign="top">
+<br>
 
-**Installation Steps:**
+1. **Download File** - Click the button above to download the `.exe` installer
+2. **Run Installer** - Double-click the downloaded installer
+3. **Installation Wizard** - Follow the installation wizard instructions
+4. **Launch** - Start StorViz from the Start menu or desktop shortcut
 
-1. **Download File**: Click the button above to download the `.app.tar.gz` file
-2. **Extract**: Double-click the downloaded file, macOS will auto-extract it
-3. **Install**: Drag `StorViz.app` to the Applications folder
-4. **Launch**: Double-click the StorViz icon in Applications to start the app
+> **💡 Tip**
+> If Windows Defender shows a warning, select "More info" → "Run anyway".
 
-> **💡 Tip**: If you see a "Cannot verify developer" warning, go to "System Preferences" → "Security & Privacy" to allow execution.
+</details>
 
-</td>
-<td width="33%" valign="top">
+<details>
+<summary>🐧 Linux - View Installation Steps</summary>
 
-**Installation Steps:**
+<br>
 
-1. **Download File**: Click the button above to download the `.exe` installer
-2. **Run Installer**: Double-click the downloaded installer
-3. **Installation Wizard**: Follow the installation wizard instructions
-4. **Launch**: Start StorViz from the Start menu or desktop shortcut
-
-> **💡 Tip**: If Windows Defender shows a warning, select "More info" → "Run anyway".
-
-</td>
-<td width="33%" valign="top">
-
-**Installation Steps:**
-
-1. **Download File**: Click the button above to download the `.AppImage` file
-2. **Set Permission**: Open terminal and run:
+1. **Download File** - Click the button above to download the `.AppImage` file
+2. **Set Permission** - Open terminal and run:
    ```bash
    chmod +x storviz_*.AppImage
    ```
-3. **Run**: Double-click to run or execute in terminal:
+3. **Run** - Double-click to run or execute in terminal:
    ```bash
    ./storviz_*.AppImage
    ```
 
-> **💡 Tip**: AppImage is a portable application that runs without installation.
+> **💡 Tip**
+> AppImage is a portable application that runs without installation.
 
-</td>
-</tr>
-</table>
+</details>
 
 ## 📋 Supported Operating System Versions
 
+### 🍎 macOS
+
 <details>
-<summary><h3>🍎 macOS</h3></summary>
+<summary>View supported versions</summary>
 
-| Operating System Version     | StorViz Version | Status |
-| ---------------------------- | --------------- | ------ |
-| **10.12 Sierra (and below)** | `1.0.0-rc.3`    | ❌     |
-| **10.13 High Sierra**        | `1.0.0-rc.3`    | ❔     |
-| **10.14 Mojave**             | `1.0.0-rc.3`    | ❔     |
-| **10.15 Catalina**           | `1.0.0-rc.3`    | ❔     |
-| **11 Big Sur**               | `1.0.0-rc.3`    | ❔     |
-| **12 Monterey**              | `1.0.0-rc.3`    | ❔     |
-| **13 Ventura**               | `1.0.0-rc.3`    | ❔     |
-| **14 Sonoma**                | `1.0.0-rc.3`    | ❔     |
-| **15 Sequoia**               | `1.0.0-rc.3`    | ❔     |
-| **26 Tahoe**                 | `1.0.0-rc.3`    | ✅     |
+<br>
 
-**Architecture Support:** Intel (x86_64) / Apple Silicon (ARM64)
+| OS Version | StorViz Version | Status |
+| ------------ | ------------ | ---- |
+| **10.12 Sierra and below** | `-` | ❌ |
+| **10.13 High Sierra** | `-` | ❔ |
+| **10.14 Mojave** | `-` | ❔ |
+| **10.15 Catalina** | `-` | ❔ |
+| **11 Big Sur** | `-` | ❔ |
+| **12 Monterey** | `-` | ❔ |
+| **13 Ventura** | `-` | ❔ |
+| **14 Sonoma** | `-` | ❔ |
+| **15 Sequoia** | `-` | ❔ |
+| **26 Tahoe** | `1.0.0-rc.3` | ✅ |
+
+**Architecture Support**: Intel (x86_64) / Apple Silicon (ARM64)
 
 </details>
 
+### 🪟 Windows
+
 <details>
-<summary><h3>🪟 Windows</h3></summary>
+<summary>View supported versions</summary>
 
-| Operating System Version | StorViz Version | Status |
-| ------------------------ | --------------- | ------ |
-| **XP**                   | `1.0.0-rc.3`    | ❌     |
-| **Vista**                | `1.0.0-rc.3`    | ❌     |
-| **7**                    | `1.0.0-rc.3`    | ❔     |
-| **7 SP1**                | `1.0.0-rc.3`    | ❔     |
-| **8**                    | `1.0.0-rc.3`    | ❔     |
-| **8.1**                  | `1.0.0-rc.3`    | ❔     |
-| **10**                   | `1.0.0-rc.3`    | ✅     |
-| **11**                   | `1.0.0-rc.3`    | ✅     |
+<br>
 
-**Architecture Support:** x64 (64-bit)
-**Additional Requirements:** WebView2 Runtime (automatically installed by the installer)
+| OS Version | StorViz Version | Status |
+| ------------ | ------------ | ---- |
+| **XP** | `-` | ❌ |
+| **Vista** | `-` | ❌ |
+| **7** | `-` | ❔ |
+| **7 SP1** | `-` | ❔ |
+| **8** | `-` | ❔ |
+| **8.1** | `-` | ❔ |
+| **10** | `1.0.0-rc.3` | ✅ |
+| **11** | `1.0.0-rc.3` | ✅ |
+
+**Architecture Support**: x64 (64-bit)
+**Additional Requirements**: WebView2 Runtime (automatically installed by the installer)
 
 </details>
 
+### 🐧 Linux
+
 <details>
-<summary><h3>🐧 Linux</h3></summary>
+<summary>View supported versions</summary>
 
-#### Ubuntu
+<br>
 
-| Operating System Version | StorViz Version | Status |
-| ------------------------ | --------------- | ------ |
-| **18.04 LTS Bionic**     | `1.0.0-rc.3`    | ❌     |
-| **20.04 LTS Focal**      | `1.0.0-rc.3`    | ❌     |
-| **22.04 LTS Jammy**      | `1.0.0-rc.3`    | ✅     |
-| **23.10 Mantic**         | `1.0.0-rc.3`    | ✅     |
-| **24.04 LTS Noble**      | `1.0.0-rc.3`    | ✅     |
-| **24.10 Oracular**       | `1.0.0-rc.3`    | ✅     |
+**Ubuntu**
 
-#### Debian
+| OS Version | StorViz Version | Status |
+| ------------ | ------------ | ---- |
+| **18.04 LTS Bionic** | `-` | ❌ |
+| **20.04 LTS Focal** | `-` | ❌ |
+| **22.04 LTS Jammy** | `1.0.0-rc.3` | ✅ |
+| **23.10 Mantic** | `1.0.0-rc.3` | ✅ |
+| **24.04 LTS Noble** | `1.0.0-rc.3` | ✅ |
+| **24.10 Oracular** | `1.0.0-rc.3` | ✅ |
 
-| Operating System Version | StorViz Version | Status |
-| ------------------------ | --------------- | ------ |
-| **10 Buster**            | `1.0.0-rc.3`    | ❌     |
-| **11 Bullseye**          | `1.0.0-rc.3`    | ❌     |
-| **12 Bookworm**          | `1.0.0-rc.3`    | ✅     |
-| **13 Trixie**            | `1.0.0-rc.3`    | ✅     |
+**Debian**
 
-#### Fedora
+| OS Version | StorViz Version | Status |
+| ------------ | ------------ | ---- |
+| **10 Buster** | `-` | ❌ |
+| **11 Bullseye** | `-` | ❌ |
+| **12 Bookworm** | `1.0.0-rc.3` | ✅ |
+| **13 Trixie** | `1.0.0-rc.3` | ✅ |
 
-| Operating System Version | StorViz Version | Status |
-| ------------------------ | --------------- | ------ |
-| **34**                   | `1.0.0-rc.3`    | ❌     |
-| **35**                   | `1.0.0-rc.3`    | ❌     |
-| **36**                   | `1.0.0-rc.3`    | ❔     |
-| **37**                   | `1.0.0-rc.3`    | ❔     |
+**Fedora**
 
-#### Red Hat Enterprise Linux (RHEL) / Rocky Linux / AlmaLinux
+| OS Version | StorViz Version | Status |
+| ------------ | ------------ | ---- |
+| **34** | `-` | ❌ |
+| **35** | `-` | ❌ |
+| **36** | `-` | ❔ |
+| **37+** | `-` | ❔ |
 
-| Operating System Version | StorViz Version | Status |
-| ------------------------ | --------------- | ------ |
-| **7**                    | `1.0.0-rc.3`    | ❌     |
-| **8**                    | `1.0.0-rc.3`    | ❌     |
-| **9**                    | `1.0.0-rc.3`    | ❔     |
+**RHEL / Rocky Linux / AlmaLinux**
 
-#### Arch Linux
+| OS Version | StorViz Version | Status |
+| ------------ | ------------ | ---- |
+| **7** | `-` | ❌ |
+| **8** | `-` | ❌ |
+| **9** | `-` | ❔ |
 
-| Operating System Version | StorViz Version | Status |
-| ------------------------ | --------------- | ------ |
-| **Rolling Release**      | `1.0.0-rc.3`    | ❌     |
+**Arch Linux**
 
-**Architecture Support:** x64 (64-bit)
-**Additional Requirements:** GLib >= 2.70, WebKitGTK 4.1
+| OS Version | StorViz Version | Status |
+| ------------ | ------------ | ---- |
+| **Rolling Release** | `-` | ❌ |
 
-> **⚠️ Note**: Linux version requires newer system libraries (GLIBC 2.35+). Users on Ubuntu 20.04 and Debian 11 are recommended to upgrade to newer versions.
+**Architecture Support**: x64 (64-bit)
+**Additional Requirements**: GLib >= 2.70, WebKitGTK 4.1
+
+> **⚠️ Note**
+> Linux version requires newer system libraries (GLIBC 2.35+).
+> Users on Ubuntu 20.04 and Debian 11 are recommended to upgrade to newer versions.
 
 </details>
 
