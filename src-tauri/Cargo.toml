@@ -2,7 +2,7 @@
 name = "storviz"
 version = "0.1.0"
 description = "儲存空間視覺化分析工具"
-authors = ["you"]
+authors = ["whes1015"]
 edition = "2021"
 license = "AGPL-3.0"
 
@@ -17,7 +17,7 @@ tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 walkdir = "2"
-sysinfo = "0.32"
+sysinfo = "0.36.1"
 lazy_static = "1.5"
 rayon = "1.10"
 filesize = "0.2"
