@@ -19,7 +19,9 @@
       "Bash(bun add:*)",
       "Bash(bun remove:*)",
       "Read(//Users/yuyu1015/.tauri/**)",
-      "Bash(rustc:*)"
+      "Bash(rustc:*)",
+      "Bash(git mv:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
