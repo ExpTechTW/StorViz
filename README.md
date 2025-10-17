@@ -101,31 +101,25 @@ StorViz 是一款功能強大的磁碟空間分析工具，幫助您快速了解
   <tr>
     <td width="50%">
       <img src="images/zh/image1.png" alt="主介面" />
-      <p align="center"><em>主介面</em></p>
     </td>
     <td width="50%">
       <img src="images/zh/image2.png" alt="檔案類型統計" />
-      <p align="center"><em>檔案類型統計</em></p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <img src="images/zh/image3.png" alt="目錄結構" />
-      <p align="center"><em>目錄結構</em></p>
     </td>
     <td width="50%">
       <img src="images/zh/image4.png" alt="深色模式" />
-      <p align="center"><em>深色模式</em></p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <img src="images/zh/image5.png" alt="多語言支援" />
-      <p align="center"><em>多語言支援</em></p>
     </td>
     <td width="50%">
       <img src="images/zh/image6.png" alt="進階分析" />
-      <p align="center"><em>進階分析</em></p>
     </td>
   </tr>
 </table>

@@ -62,14 +62,16 @@ jobs:
       - name: Build frontend
         run: bun run build
 
-      - name: Disable updater artifacts for CI
+      - name: Disable updater artifacts for CI (macOS)
+        if: matrix.platform == 'macos-latest'
         run: |
-          # Temporarily disable createUpdaterArtifacts for CI builds
-          if [[ "${{ matrix.platform }}" == "macos-latest" ]]; then
-            sed -i '' 's/"createUpdaterArtifacts": true/"createUpdaterArtifacts": false/' src-tauri/tauri.conf.json
-          else
-            sed -i 's/"createUpdaterArtifacts": true/"createUpdaterArtifacts": false/' src-tauri/tauri.conf.json
-          fi
+          sed -i '' 's/"createUpdaterArtifacts": true/"createUpdaterArtifacts": false/' src-tauri/tauri.conf.json
+
+      - name: Disable updater artifacts for CI (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          (Get-Content src-tauri/tauri.conf.json) -replace '"createUpdaterArtifacts": true', '"createUpdaterArtifacts": false' | Set-Content src-tauri/tauri.conf.json
+        shell: pwsh
 
       - name: Build Tauri app
         run: bun tauri build ${{ matrix.args }}

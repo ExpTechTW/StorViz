@@ -101,31 +101,25 @@ StorViz は、ストレージの使用状況を素早く把握できる強力な
   <tr>
     <td width="50%">
       <img src="images/zh/image1.png" alt="メインインターフェース" />
-      <p align="center"><em>メインインターフェース</em></p>
     </td>
     <td width="50%">
       <img src="images/zh/image2.png" alt="ファイルタイプ統計" />
-      <p align="center"><em>ファイルタイプ統計</em></p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <img src="images/zh/image3.png" alt="ディレクトリ構造" />
-      <p align="center"><em>ディレクトリ構造</em></p>
     </td>
     <td width="50%">
       <img src="images/zh/image4.png" alt="ダークモード" />
-      <p align="center"><em>ダークモード</em></p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <img src="images/zh/image5.png" alt="多言語サポート" />
-      <p align="center"><em>多言語サポート</em></p>
     </td>
     <td width="50%">
       <img src="images/zh/image6.png" alt="高度な分析" />
-      <p align="center"><em>高度な分析</em></p>
     </td>
   </tr>
 </table>

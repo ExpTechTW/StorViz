@@ -101,31 +101,25 @@ StorViz is a powerful disk space analysis tool that helps you quickly understand
   <tr>
     <td width="50%">
       <img src="images/zh/image1.png" alt="Main Interface" />
-      <p align="center"><em>Main Interface</em></p>
     </td>
     <td width="50%">
       <img src="images/zh/image2.png" alt="File Type Statistics" />
-      <p align="center"><em>File Type Statistics</em></p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <img src="images/zh/image3.png" alt="Directory Structure" />
-      <p align="center"><em>Directory Structure</em></p>
     </td>
     <td width="50%">
       <img src="images/zh/image4.png" alt="Dark Mode" />
-      <p align="center"><em>Dark Mode</em></p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <img src="images/zh/image5.png" alt="Multi-language Support" />
-      <p align="center"><em>Multi-language Support</em></p>
     </td>
     <td width="50%">
       <img src="images/zh/image6.png" alt="Advanced Analysis" />
-      <p align="center"><em>Advanced Analysis</em></p>
     </td>
   </tr>
 </table>
