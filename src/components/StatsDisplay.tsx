@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BarChart3, FileStack, HardDrive, Trash2, Database } from 'lucide-react'
 import { getStats, type ScanStats } from '@/lib/statsStorage'
-import { useCountAnimation } from '@/hooks/useCountAnimation'
 import { useTranslation } from 'react-i18next'
 
 interface StatCardProps {
@@ -16,8 +15,34 @@ interface StatCardProps {
 }
 
 function StatCard({ icon, label, value, unit, formatValue, color }: StatCardProps) {
-  const animatedValue = useCountAnimation(value, 1500)
-  const displayValue = formatValue ? formatValue(animatedValue) : animatedValue.toLocaleString()
+  const valueRef = useRef<HTMLParagraphElement>(null)
+  const formatRef = useRef(formatValue)
+  formatRef.current = formatValue
+
+  useEffect(() => {
+    const el = valueRef.current
+    if (!el) return
+
+    const renderValue = (current: number) => {
+      el.textContent = formatRef.current ? formatRef.current(current) : current.toLocaleString()
+    }
+
+    if (value === 0) {
+      renderValue(0)
+      return
+    }
+
+    const start = performance.now()
+    let frame = 0
+    const tick = (now: number) => {
+      const progress = Math.min((now - start) / 1500, 1)
+      const eased = 1 - Math.pow(1 - progress, 4)
+      renderValue(progress < 1 ? Math.floor(value * eased) : value)
+      if (progress < 1) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [value])
 
   return (
     <div className="bg-card/60 backdrop-blur-md rounded-lg border border-border/50 p-3 flex items-center gap-3 hover:bg-card/80 hover:border-primary/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg group relative overflow-hidden">
@@ -30,8 +55,8 @@ function StatCard({ icon, label, value, unit, formatValue, color }: StatCardProp
       <div className="relative z-10">
         <h3 className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider mb-1">{label}</h3>
         <div className="flex items-center gap-1.5">
-          <p className="text-xl font-bold tabular-nums leading-none" style={{ color }}>
-            {displayValue}
+          <p ref={valueRef} className="text-xl font-bold tabular-nums leading-none" style={{ color }}>
+            {formatValue ? formatValue(0) : '0'}
           </p>
           {unit && <p className="text-xs font-semibold text-foreground">{unit}</p>}
         </div>
@@ -61,26 +86,6 @@ function formatToFiveDigits(value: number): string {
 
 // 格式化檔案數量（智能小數點處理）
 function formatCount(count: number): string {
-  if (count === 0) return '0'
-
-  // 億個 (100,000,000+)
-  if (count >= 100000000) {
-    const value = count / 100000000
-    return value % 1 === 0 ? value.toString() : value.toFixed(1)
-  }
-
-  // 萬個 (10,000+)
-  if (count >= 10000) {
-    const value = count / 10000
-    return value % 1 === 0 ? value.toString() : value.toFixed(1)
-  }
-
-  // 個 (<10,000)
-  return count.toString()
-}
-
-// 格式化刪除檔案數量（智能小數點處理）
-function formatDeletedCount(count: number): string {
   if (count === 0) return '0'
 
   // 億個 (100,000,000+)
@@ -207,7 +212,7 @@ export function StatsDisplay() {
         label={t('home.stats.totalDeleted')}
         value={stats.totalDeleted}
         unit={getCountUnit(stats.totalDeleted)}
-        formatValue={formatDeletedCount}
+        formatValue={formatCount}
         color="#f59e0b"
       />
 

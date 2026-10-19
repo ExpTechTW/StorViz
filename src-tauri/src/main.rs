@@ -12,6 +12,7 @@ use rayon::prelude::*;
 use sysinfo::Disks;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
+#[cfg(not(unix))]
 use filesize::PathExt;
 use tauri_plugin_updater::UpdaterExt;
 
@@ -425,7 +426,15 @@ async fn scan_directory_streaming(path: String, on_batch: Channel<PartialScanRes
             let _ = on_batch.send(initial_payload);
         }
 
-        match scan_directory_recursive(root_path, &on_batch, &state, root_path) {
+        let canonical_root = fs::canonicalize(root_path).ok();
+        match scan_directory_recursive(
+            root_path,
+            &on_batch,
+            &state,
+            root_path,
+            canonical_root.as_deref(),
+            false,
+        ) {
             Ok(root_node) => {
                 let limited_root = build_limited_depth_node(&root_node, MAX_DEPTH);
                 send_final_batch(&on_batch, &state, limited_root, disk_info);
@@ -487,18 +496,7 @@ async fn delete_files_batch(paths: Vec<String>, on_progress: Channel<DeletionPro
             let path_obj = Path::new(&normalized_path);
             let current_path = normalized_path.clone();
 
-            // Calculate size before deletion
-            let size_before = if path_obj.exists() {
-                if path_obj.is_file() {
-                    path_obj.size_on_disk().unwrap_or(0)
-                } else if path_obj.is_dir() {
-                    calculate_dir_size(path_obj)
-                } else {
-                    0
-                }
-            } else {
-                0
-            };
+            let size_before = path_disk_usage(path_obj);
 
             // Send progress update
             let progress = DeletionProgress {
@@ -555,18 +553,79 @@ async fn delete_files_batch(paths: Vec<String>, on_progress: Channel<DeletionPro
     Ok(())
 }
 
-// Helper function to calculate directory size recursively
+fn zero_leaf(path: &Path, path_str: String) -> FileNode {
+    FileNode {
+        name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
+        size: 0,
+        path: path_str,
+        children: None,
+        is_directory: false,
+    }
+}
+
+fn on_disk_size(path: &Path, link_meta: &fs::Metadata) -> u64 {
+    #[cfg(unix)]
+    {
+        let _ = path;
+        link_meta.blocks() * 512
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = link_meta;
+        path.size_on_disk().unwrap_or(0)
+    }
+}
+
+fn path_disk_usage(path: &Path) -> u64 {
+    let Ok(link_meta) = fs::symlink_metadata(path) else {
+        return 0;
+    };
+
+    if link_meta.file_type().is_symlink() {
+        let Ok(followed) = fs::metadata(path) else {
+            return 0;
+        };
+        if followed.is_file() {
+            on_disk_size(path, &link_meta)
+        } else if followed.is_dir() {
+            calculate_dir_size(path)
+        } else {
+            0
+        }
+    } else if link_meta.is_file() {
+        on_disk_size(path, &link_meta)
+    } else if link_meta.is_dir() {
+        calculate_dir_size(path)
+    } else {
+        0
+    }
+}
+
 fn calculate_dir_size(path: &Path) -> u64 {
     let mut total_size = 0u64;
+    let Ok(entries) = fs::read_dir(path) else {
+        return total_size;
+    };
 
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            let entry_path = entry.path();
-            if entry_path.is_file() {
-                total_size += entry_path.size_on_disk().unwrap_or(0);
-            } else if entry_path.is_dir() {
+    for entry in entries.flatten() {
+        let Ok(link_meta) = entry.metadata() else {
+            continue;
+        };
+        let entry_path = entry.path();
+
+        if link_meta.file_type().is_symlink() {
+            let Ok(followed) = fs::metadata(&entry_path) else {
+                continue;
+            };
+            if followed.is_file() {
+                total_size += on_disk_size(&entry_path, &link_meta);
+            } else if followed.is_dir() {
                 total_size += calculate_dir_size(&entry_path);
             }
+        } else if link_meta.is_file() {
+            total_size += on_disk_size(&entry_path, &link_meta);
+        } else if link_meta.is_dir() {
+            total_size += calculate_dir_size(&entry_path);
         }
     }
 
@@ -717,199 +776,114 @@ fn scan_directory_recursive(
     channel: &Channel<PartialScanResult>,
     state: &ScanState,
     root_path: &Path,
+    canonical_root: Option<&Path>,
+    parent_canonical_ok: bool,
 ) -> Result<FileNode, String> {
-    // Check if scan has been cancelled
     if state.is_cancelled() {
         return Err("Scan cancelled".to_string());
     }
 
     let path_str = path.to_string_lossy().to_string();
-
-    // Update current scanning path
     state.set_current_path(&path_str);
-
-    // Send path update if interval reached
     if state.should_send_path_update() {
         send_path_update(channel, state);
     }
 
-    // Prevent scanning above the root path to avoid duplicate counting
-    // Use canonicalized paths for accurate comparison
-    if let Ok(canonical_root) = fs::canonicalize(root_path) {
-        if let Ok(canonical_path) = fs::canonicalize(path) {
-            if !canonical_path.starts_with(&canonical_root) {
-                return Ok(FileNode {
-                    name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
-                    size: 0,
-                    path: path_str,
-                    children: None,
-                    is_directory: false,
-                });
+    let link_meta = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
+    let is_link = link_meta.file_type().is_symlink();
+    let followed_meta = if is_link {
+        Some(fs::metadata(path).map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
+    let metadata = followed_meta.as_ref().unwrap_or(&link_meta);
+
+    let trust_parent = parent_canonical_ok && !is_link && metadata.is_file();
+    let canonical_path = if trust_parent {
+        None
+    } else {
+        fs::canonicalize(path).ok()
+    };
+
+    if !trust_parent {
+        if let Some(canon) = canonical_path.as_ref() {
+            if let Some(root) = canonical_root {
+                if !canon.starts_with(root) {
+                    return Ok(zero_leaf(path, path_str));
+                }
+            }
+            if state.is_in_recursion_stack(canon) {
+                return Ok(zero_leaf(path, path_str));
             }
         }
     }
-    
-    // Check for circular path using canonicalized path
-    if let Ok(canonical_path) = fs::canonicalize(path) {
-        if state.is_in_recursion_stack(&canonical_path) {
-            return Ok(FileNode {
-                name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
-                size: 0,
-                path: path_str,
-                children: None,
-                is_directory: false,
-            });
-        }
-    }
-    
-    let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
-    
-    // Check if we've already visited this inode (prevents symlink loops and hard link duplicates)
-    // Only use inode tracking on Unix systems
+
     #[cfg(unix)]
     {
         let inode = metadata.ino();
         if state.is_visited_inode(inode) {
-            return Ok(FileNode {
-                name: path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
-                size: 0,
-                path: path_str,
-                children: None,
-                is_directory: false,
-            });
+            return Ok(zero_leaf(path, path_str));
         }
         state.mark_visited_inode(inode);
     }
-    
+
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
     state.increment_counter();
 
-    // Handle symlinks by following them
-    if metadata.file_type().is_symlink() {
-        // Try to follow the symlink
-        if let Ok(target_path) = fs::read_link(path) {
-            if let Ok(target_metadata) = fs::metadata(&target_path) {
-                if target_metadata.is_file() {
-                    // Use filesize to get actual disk usage for symlinked files
-                    let file_size = target_path.size_on_disk().unwrap_or(0);
-                    state.add_size(file_size);
-                    
-                    return Ok(FileNode {
-                        name,
-                        size: file_size,
-                        path: path_str,
-                        children: None,
-                        is_directory: false,
-                    });
-                } else if target_metadata.is_dir() {
-                    // For directory symlinks, check if target is above root path or in recursion stack
-                    if let Ok(canonical_root) = fs::canonicalize(root_path) {
-                        if let Ok(canonical_target) = fs::canonicalize(&target_path) {
-                            if !canonical_target.starts_with(&canonical_root) {
-                                return Ok(FileNode {
-                                    name,
-                                    size: 0,
-                                    path: path_str,
-                                    children: None,
-                                    is_directory: false,
-                                });
-                            }
-                        }
-                    }
-                    
-                    if let Ok(canonical_target) = fs::canonicalize(&target_path) {
-                        if state.is_in_recursion_stack(&canonical_target) {
-                            return Ok(FileNode {
-                                name,
-                                size: 0,
-                                path: path_str,
-                                children: None,
-                                is_directory: false,
-                            });
-                        }
-                    }
-                    
-                    // Safe to scan the target directory
-                    return scan_directory_recursive(&target_path, channel, state, root_path);
-                }
-            }
-        }
-        
-        // If we can't follow the symlink, return size 0
+    if metadata.is_file() {
+        let file_size = on_disk_size(path, &link_meta);
+        state.add_size(file_size);
         return Ok(FileNode {
             name,
-            size: 0,
+            size: file_size,
             path: path_str,
             children: None,
             is_directory: false,
         });
     }
 
-    if metadata.is_file() {
-        // Use filesize to get actual disk usage (handles sparse files correctly)
-        let file_size = path.size_on_disk().unwrap_or(0);
-
-        state.add_size(file_size);
-
-        // Don't add files to batch buffer - only send directories to reduce IPC load
-        let node = FileNode {
-            name,
-            size: file_size,
-            path: path_str,
-            children: None,
-            is_directory: false,
-        };
-
-        return Ok(node);
-    }
-
-    // Scan directory with parallel processing
     if let Ok(entries) = fs::read_dir(path) {
-        // Add current directory to recursion stack
-        if let Ok(canonical_path) = fs::canonicalize(path) {
-            state.push_to_recursion_stack(&canonical_path);
+        if let Some(canon) = canonical_path.as_ref() {
+            state.push_to_recursion_stack(canon);
         }
 
         let entries_vec: Vec<_> = entries.flatten().collect();
-
-        // No filtering - scan everything
-        let filtered_entries = entries_vec;
-
-        // For root directory's direct children, send immediate progress updates
         let is_root_level = path == root_path;
+        let child_parent_ok = canonical_path.is_some();
 
-        let children: Vec<FileNode> = filtered_entries
+        let children: Vec<FileNode> = entries_vec
             .par_iter()
             .filter_map(|entry| {
-                // Send progress update before scanning each root-level directory
                 if is_root_level {
                     send_path_update(channel, state);
                 }
-                scan_directory_recursive(&entry.path(), channel, state, root_path).ok()
+                scan_directory_recursive(
+                    &entry.path(),
+                    channel,
+                    state,
+                    root_path,
+                    canonical_root,
+                    child_parent_ok,
+                )
+                .ok()
             })
             .collect();
-        
-        // Remove current directory from recursion stack
-        if let Ok(canonical_path) = fs::canonicalize(path) {
-            state.pop_from_recursion_stack(&canonical_path);
+
+        if let Some(canon) = canonical_path.as_ref() {
+            state.pop_from_recursion_stack(canon);
         }
 
         let dir_total_size: u64 = children.iter().map(|c| c.size).sum();
-
-        // Create directory node for return (with full children tree)
         let dir_node_with_children = FileNode {
-            name: name.clone(),
+            name,
             size: dir_total_size,
-            path: path_str.clone(),
+            path: path_str,
             children: Some(children),
             is_directory: true,
         };
 
-        // Only send compact nodes for direct children of root (depth 1)
-        // This prevents sending duplicate nested directories
         if let Some(parent) = path.parent() {
             if parent == root_path {
-                // This is a direct child of root - send it with full subtree
                 let compact_dir = to_compact_node(&dir_node_with_children);
                 if state.add_compact_to_buffer(compact_dir) {
                     send_compact_batch(channel, state);

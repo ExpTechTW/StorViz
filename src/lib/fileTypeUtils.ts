@@ -1,8 +1,6 @@
 import {
   Folder,
-  FileImage,
   FileVideo,
-  FileAudio,
   Archive,
   FileCode,
   Globe,
@@ -35,7 +33,6 @@ import {
   Container,
   GitBranch,
   Workflow,
-  Layers,
   Package2,
   PackageOpen,
   FileStack,
@@ -58,493 +55,167 @@ export interface FileTypeInfo {
   color: string
 }
 
+const DIRECTORY_TYPES = new Map<string, FileTypeInfo>()
+const NAME_TYPES = new Map<string, FileTypeInfo>()
+const EXTENSION_TYPES = new Map<string, FileTypeInfo>()
+
+function addTypes(map: Map<string, FileTypeInfo>, keys: readonly string[], value: FileTypeInfo) {
+  for (const key of keys) {
+    if (!map.has(key)) map.set(key, value)
+  }
+}
+
+addTypes(DIRECTORY_TYPES, ['.git'], { icon: FolderGit2, label: 'Git Repository', color: '#f05033' })
+addTypes(DIRECTORY_TYPES, ['node_modules', 'vendor', 'packages', 'bower_components', '.venv', 'venv', '__pycache__'], { icon: Box, label: 'Dependencies', color: '#8b5cf6' })
+addTypes(DIRECTORY_TYPES, ['.vscode', '.idea', '.vs'], { icon: Settings, label: 'IDE Config', color: '#0078d7' })
+addTypes(DIRECTORY_TYPES, ['.github', '.gitlab', '.circleci'], { icon: Workflow, label: 'CI/CD', color: '#2088ff' })
+addTypes(DIRECTORY_TYPES, ['dist', 'build', 'out', 'target', 'bin'], { icon: Package2, label: 'Build Output', color: '#f59e0b' })
+addTypes(DIRECTORY_TYPES, ['src', 'source', 'app', 'lib', 'components'], { icon: Code2, label: 'Source', color: '#3b82f6' })
+addTypes(DIRECTORY_TYPES, ['test', 'tests', '__tests__', 'spec', 'specs'], { icon: FileStack, label: 'Tests', color: '#10b981' })
+addTypes(DIRECTORY_TYPES, ['docs', 'doc', 'documentation'], { icon: BookOpen, label: 'Documentation', color: '#6366f1' })
+addTypes(DIRECTORY_TYPES, ['assets', 'static', 'public', 'resources'], { icon: Image, label: 'Assets', color: '#ec4899' })
+
+addTypes(NAME_TYPES, ['dockerfile', 'containerfile'], { icon: Container, label: 'Docker', color: '#2496ed' })
+addTypes(NAME_TYPES, ['makefile', 'rakefile', 'gemfile', 'podfile', 'vagrantfile', 'gruntfile', 'gulpfile'], { icon: Settings, label: 'Build Config', color: '#2496ed' })
+addTypes(NAME_TYPES, ['license', 'licence', 'readme', 'changelog', 'contributing', 'authors', 'notice'], { icon: FileText, label: 'Documentation', color: '#6b7280' })
+addTypes(NAME_TYPES, ['.gitignore', '.dockerignore', '.npmignore', '.eslintignore', '.prettierignore'], { icon: GitBranch, label: 'Ignore File', color: '#6b7280' })
+addTypes(NAME_TYPES, ['.env', '.env.local', '.env.development', '.env.production', '.env.test'], { icon: Lock, label: 'Environment', color: '#eab308' })
+addTypes(NAME_TYPES, ['package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'], { icon: Package, label: 'Package Config', color: '#10b981' })
+addTypes(NAME_TYPES, ['tsconfig.json', 'jsconfig.json'], { icon: Settings, label: 'TS Config', color: '#3178c6' })
+addTypes(NAME_TYPES, ['.eslintrc', '.eslintrc.js', '.eslintrc.json', '.prettierrc'], { icon: Settings, label: 'Linter Config', color: '#4b32c3' })
+addTypes(NAME_TYPES, ['dockerfile', 'containerfile', '.dockerignore'], { icon: Container, label: 'Docker', color: '#2496ed' })
+
+addTypes(EXTENSION_TYPES, ['jpg', 'jpeg', 'jpe', 'jfif', 'png', 'gif', 'bmp', 'dib', 'webp', 'ico', 'cur', 'tiff', 'tif', 'ppm', 'pgm', 'pbm', 'pnm'], { icon: Image, label: 'Image', color: '#f472b6' })
+addTypes(EXTENSION_TYPES, ['svg', 'svgz', 'ai', 'eps', 'ps', 'cdr', 'cgm', 'wmf', 'emf'], { icon: Pen, label: 'Vector', color: '#ec4899' })
+addTypes(EXTENSION_TYPES, ['psd', 'psb', 'xcf', 'kra', 'sketch', 'xd', 'fig', 'figma', 'afdesign', 'afphoto', 'clip'], { icon: Palette, label: 'Design', color: '#ec4899' })
+addTypes(EXTENSION_TYPES, ['raw', 'cr2', 'cr3', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 'raf', 'dcr', 'mrw', 'nrw', 'rwl', 'srw', 'x3f'], { icon: Camera, label: 'RAW Image', color: '#f59e0b' })
+addTypes(EXTENSION_TYPES, ['mp4', 'm4v', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'mpg', 'mpeg', 'mpe', 'mpv', 'm2v', '3gp', '3g2', 'ogv', 'ogg', 'vob', 'divx'], { icon: Video, label: 'Video', color: '#8b5cf6' })
+addTypes(EXTENSION_TYPES, ['mxf', 'ts', 'm2ts', 'mts', 'f4v', 'swf', 'rm', 'rmvb', 'asf', 'qt', 'yuv', 'y4m', 'amv'], { icon: FileVideo, label: 'Video', color: '#8b5cf6' })
+addTypes(EXTENSION_TYPES, ['prproj', 'aep', 'veg', 'fcpx', 'motn', 'imovieproj', 'davinci'], { icon: Film, label: 'Video Project', color: '#7c3aed' })
+addTypes(EXTENSION_TYPES, ['flac', 'ape', 'alac', 'wav', 'aiff', 'aif', 'aifc', 'au', 'snd', 'pcm', 'dsd', 'dsf', 'dff'], { icon: Volume2, label: 'Audio', color: '#a855f7' })
+addTypes(EXTENSION_TYPES, ['mp3', 'aac', 'm4a', 'ogg', 'oga', 'opus', 'wma', 'mka', 'ra', 'ram', 'voc', 'amr', 'awb'], { icon: Music2, label: 'Audio', color: '#a855f7' })
+addTypes(EXTENSION_TYPES, ['mid', 'midi', 'kar', 'rmi', 'mus', 'syx'], { icon: Music2, label: 'MIDI', color: '#c084fc' })
+addTypes(EXTENSION_TYPES, ['flp', 'als', 'ptx', 'logic', 'band', 'reason', 'cpr', 'cwp', 'sesx', 'aup', 'aup3'], { icon: Mic, label: 'Audio Project', color: '#9333ea' })
+addTypes(EXTENSION_TYPES, ['zip', 'rar', '7z', 'tar', 'gz', 'gzip', 'bz2', 'bzip2', 'xz', 'lz', 'lzma', 'z', 'tgz', 'tbz', 'tbz2', 'txz', 'tlz'], { icon: Archive, label: 'Archive', color: '#f59e0b' })
+addTypes(EXTENSION_TYPES, ['iso', 'img', 'dmg', 'toast', 'vcd', 'cue', 'bin', 'mdf', 'mds', 'nrg', 'cdi', 'b5t', 'b6t', 'bwt', 'ccd', 'isz', 'uif'], { icon: HardDrive, label: 'Disk Image', color: '#fb923c' })
+addTypes(EXTENSION_TYPES, ['pkg', 'deb', 'rpm', 'apk', 'msi', 'msix', 'appx', 'snap', 'flatpak', 'appimage'], { icon: PackageOpen, label: 'Package', color: '#f59e0b' })
+addTypes(EXTENSION_TYPES, ['cab', 'arj', 'lzh', 'ace', 'zoo', 'arc', 'pak', 'sit', 'sitx', 'sea', 'uue', 'uu'], { icon: Archive, label: 'Archive', color: '#f59e0b' })
+addTypes(EXTENSION_TYPES, ['js', 'jsx', 'mjs', 'cjs', 'es6', 'es'], { icon: FileCode, label: 'JavaScript', color: '#f7df1e' })
+addTypes(EXTENSION_TYPES, ['ts', 'tsx', 'mts', 'cts'], { icon: FileCode, label: 'TypeScript', color: '#3178c6' })
+addTypes(EXTENSION_TYPES, ['vue', 'svelte', 'astro'], { icon: Puzzle, label: 'Component', color: '#42b883' })
+addTypes(EXTENSION_TYPES, ['html', 'htm', 'xhtml', 'shtml', 'dhtml', 'hta'], { icon: Globe, label: 'HTML', color: '#e34c26' })
+addTypes(EXTENSION_TYPES, ['css', 'scss', 'sass', 'less', 'styl', 'stylus', 'pcss', 'postcss'], { icon: Palette, label: 'Stylesheet', color: '#264de4' })
+addTypes(EXTENSION_TYPES, ['wasm', 'wat'], { icon: Cpu, label: 'WebAssembly', color: '#654ff0' })
+addTypes(EXTENSION_TYPES, ['py', 'pyw', 'pyx', 'pyd', 'pyi', 'pyc', 'pyo', 'pyz', 'pyzw'], { icon: FileCode, label: 'Python', color: '#3776ab' })
+addTypes(EXTENSION_TYPES, ['ipynb', 'jupyter'], { icon: FileStack, label: 'Jupyter', color: '#f37726' })
+addTypes(EXTENSION_TYPES, ['java', 'jsp', 'jspx'], { icon: FileCode, label: 'Java', color: '#f89820' })
+addTypes(EXTENSION_TYPES, ['class', 'jar', 'war', 'ear', 'jad'], { icon: Archive, label: 'Java Binary', color: '#f89820' })
+addTypes(EXTENSION_TYPES, ['kt', 'kts', 'ktm'], { icon: FileCode, label: 'Kotlin', color: '#7f52ff' })
+addTypes(EXTENSION_TYPES, ['scala', 'sc'], { icon: FileCode, label: 'Scala', color: '#dc322f' })
+addTypes(EXTENSION_TYPES, ['groovy', 'gvy', 'gradle'], { icon: FileCode, label: 'Groovy', color: '#4298b8' })
+addTypes(EXTENSION_TYPES, ['c', 'h', 'i'], { icon: FileCode, label: 'C', color: '#555555' })
+addTypes(EXTENSION_TYPES, ['cpp', 'cc', 'cxx', 'c++', 'hpp', 'hh', 'hxx', 'h++', 'ii', 'ipp', 'tcc', 'tpp'], { icon: FileCode, label: 'C++', color: '#f34b7d' })
+addTypes(EXTENSION_TYPES, ['m', 'mm'], { icon: FileCode, label: 'Objective-C', color: '#438eff' })
+addTypes(EXTENSION_TYPES, ['cs', 'csx', 'cshtml', 'razor'], { icon: FileCode, label: 'C#', color: '#239120' })
+addTypes(EXTENSION_TYPES, ['vb', 'vbs', 'vba', 'bas'], { icon: FileCode, label: 'Visual Basic', color: '#945db7' })
+addTypes(EXTENSION_TYPES, ['fs', 'fsi', 'fsx', 'fsscript'], { icon: FileCode, label: 'F#', color: '#b845fc' })
+addTypes(EXTENSION_TYPES, ['dll', 'pdb', 'winmd'], { icon: Binary, label: '.NET Binary', color: '#512bd4' })
+addTypes(EXTENSION_TYPES, ['rs', 'rlib'], { icon: FileCode, label: 'Rust', color: '#ce422b' })
+addTypes(EXTENSION_TYPES, ['go', 'mod', 'sum'], { icon: FileCode, label: 'Go', color: '#00add8' })
+addTypes(EXTENSION_TYPES, ['zig'], { icon: FileCode, label: 'Zig', color: '#f7a41d' })
+addTypes(EXTENSION_TYPES, ['v'], { icon: FileCode, label: 'V', color: '#5d87bd' })
+addTypes(EXTENSION_TYPES, ['nim', 'nims', 'nimble'], { icon: FileCode, label: 'Nim', color: '#ffe953' })
+addTypes(EXTENSION_TYPES, ['php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'phps', 'phar'], { icon: FileCode, label: 'PHP', color: '#777bb4' })
+addTypes(EXTENSION_TYPES, ['rb', 'rbw', 'rake', 'erb', 'gemspec', 'ru'], { icon: FileCode, label: 'Ruby', color: '#cc342d' })
+addTypes(EXTENSION_TYPES, ['pl', 'pm', 'pod', 'perl'], { icon: FileCode, label: 'Perl', color: '#0298c3' })
+addTypes(EXTENSION_TYPES, ['lua'], { icon: FileCode, label: 'Lua', color: '#000080' })
+addTypes(EXTENSION_TYPES, ['r', 'rdata', 'rds', 'rmd'], { icon: FileCode, label: 'R', color: '#198ce7' })
+addTypes(EXTENSION_TYPES, ['sh', 'bash', 'zsh', 'fish', 'ksh', 'csh', 'tcsh'], { icon: Terminal, label: 'Shell', color: '#4eaa25' })
+addTypes(EXTENSION_TYPES, ['bat', 'cmd', 'btm'], { icon: Terminal, label: 'Batch', color: '#c1f12e' })
+addTypes(EXTENSION_TYPES, ['ps1', 'psm1', 'psd1', 'ps1xml'], { icon: Terminal, label: 'PowerShell', color: '#012456' })
+addTypes(EXTENSION_TYPES, ['hs', 'lhs'], { icon: FileCode, label: 'Haskell', color: '#5e5086' })
+addTypes(EXTENSION_TYPES, ['ml', 'mli', 'mll', 'mly'], { icon: FileCode, label: 'OCaml', color: '#3be133' })
+addTypes(EXTENSION_TYPES, ['ex', 'exs', 'eex', 'leex'], { icon: FileCode, label: 'Elixir', color: '#6e4a7e' })
+addTypes(EXTENSION_TYPES, ['erl', 'hrl'], { icon: FileCode, label: 'Erlang', color: '#b83998' })
+addTypes(EXTENSION_TYPES, ['clj', 'cljs', 'cljc', 'edn'], { icon: FileCode, label: 'Clojure', color: '#db5855' })
+addTypes(EXTENSION_TYPES, ['lisp', 'lsp', 'l', 'cl', 'el'], { icon: FileCode, label: 'Lisp', color: '#3fb68b' })
+addTypes(EXTENSION_TYPES, ['scm', 'ss', 'rkt'], { icon: FileCode, label: 'Scheme', color: '#1e4aec' })
+addTypes(EXTENSION_TYPES, ['swift'], { icon: FileCode, label: 'Swift', color: '#f05138' })
+addTypes(EXTENSION_TYPES, ['dart'], { icon: FileCode, label: 'Dart', color: '#00b4ab' })
+addTypes(EXTENSION_TYPES, ['jl'], { icon: FileCode, label: 'Julia', color: '#9558b2' })
+addTypes(EXTENSION_TYPES, ['d', 'di'], { icon: FileCode, label: 'D', color: '#ba595e' })
+addTypes(EXTENSION_TYPES, ['pas', 'pp', 'dpr'], { icon: FileCode, label: 'Pascal', color: '#e3f171' })
+addTypes(EXTENSION_TYPES, ['f', 'f90', 'f95', 'f03', 'f08', 'for', 'ftn', 'fpp'], { icon: FileCode, label: 'Fortran', color: '#734f96' })
+addTypes(EXTENSION_TYPES, ['cob', 'cbl', 'cpy'], { icon: FileCode, label: 'COBOL', color: '#555555' })
+addTypes(EXTENSION_TYPES, ['ada', 'adb', 'ads'], { icon: FileCode, label: 'Ada', color: '#02f88c' })
+addTypes(EXTENSION_TYPES, ['asm', 's', 'nasm'], { icon: Cpu, label: 'Assembly', color: '#6e4c13' })
+addTypes(EXTENSION_TYPES, ['json', 'jsonc', 'json5', 'geojson', 'topojson'], { icon: FileJson, label: 'JSON', color: '#10b981' })
+addTypes(EXTENSION_TYPES, ['xml', 'xsl', 'xslt', 'xsd', 'dtd', 'rss', 'atom', 'plist', 'xaml', 'xul', 'xbl'], { icon: Braces, label: 'XML', color: '#f97316' })
+addTypes(EXTENSION_TYPES, ['yaml', 'yml'], { icon: FileType, label: 'YAML', color: '#ef4444' })
+addTypes(EXTENSION_TYPES, ['toml'], { icon: Settings, label: 'TOML', color: '#9c4221' })
+addTypes(EXTENSION_TYPES, ['ini', 'inf', 'conf', 'config', 'cfg', 'properties', 'prop'], { icon: Settings, label: 'Config', color: '#6b7280' })
+addTypes(EXTENSION_TYPES, ['csv', 'tsv', 'tab', 'psv'], { icon: Sheet, label: 'Data', color: '#059669' })
+addTypes(EXTENSION_TYPES, ['parquet', 'avro', 'orc', 'arrow'], { icon: Database, label: 'Big Data', color: '#0891b2' })
+addTypes(EXTENSION_TYPES, ['txt', 'text', 'log', 'out', 'err'], { icon: FileText, label: 'Text', color: '#6b7280' })
+addTypes(EXTENSION_TYPES, ['md', 'markdown', 'mdown', 'mkd', 'mdwn', 'mdtxt', 'mdtext', 'mdx'], { icon: BookOpen, label: 'Markdown', color: '#083344' })
+addTypes(EXTENSION_TYPES, ['rst', 'rest'], { icon: BookOpen, label: 'reStructuredText', color: '#141414' })
+addTypes(EXTENSION_TYPES, ['tex', 'latex', 'ltx', 'bib', 'sty', 'cls'], { icon: FileText, label: 'LaTeX', color: '#008080' })
+addTypes(EXTENSION_TYPES, ['adoc', 'asciidoc', 'asc'], { icon: BookOpen, label: 'AsciiDoc', color: '#e40046' })
+addTypes(EXTENSION_TYPES, ['org'], { icon: BookOpen, label: 'Org Mode', color: '#77aa99' })
+addTypes(EXTENSION_TYPES, ['pdf'], { icon: FileText, label: 'PDF', color: '#dc2626' })
+addTypes(EXTENSION_TYPES, ['doc', 'docx', 'docm', 'dot', 'dotx', 'dotm', 'odt', 'ott', 'rtf', 'wps'], { icon: FileText, label: 'Document', color: '#2563eb' })
+addTypes(EXTENSION_TYPES, ['xls', 'xlsx', 'xlsm', 'xlsb', 'xlt', 'xltx', 'xltm', 'ods', 'ots', 'numbers'], { icon: FileSpreadsheet, label: 'Spreadsheet', color: '#16a34a' })
+addTypes(EXTENSION_TYPES, ['ppt', 'pptx', 'pptm', 'pot', 'potx', 'potm', 'pps', 'ppsx', 'ppsm', 'odp', 'otp', 'key'], { icon: Presentation, label: 'Presentation', color: '#ea580c' })
+addTypes(EXTENSION_TYPES, ['epub', 'mobi', 'azw', 'azw3', 'fb2', 'djvu'], { icon: BookOpen, label: 'eBook', color: '#7c3aed' })
+addTypes(EXTENSION_TYPES, ['db', 'sqlite', 'sqlite3', 'db3', 's3db', 'sl3'], { icon: Database, label: 'SQLite', color: '#0ea5e9' })
+addTypes(EXTENSION_TYPES, ['sql', 'mysql', 'pgsql', 'psql', 'plsql'], { icon: Database, label: 'SQL', color: '#0891b2' })
+addTypes(EXTENSION_TYPES, ['mdb', 'accdb', 'accde', 'accdt', 'accdr'], { icon: Database, label: 'Access', color: '#a50e0e' })
+addTypes(EXTENSION_TYPES, ['dbf', 'dbc', 'fpt'], { icon: Database, label: 'dBASE', color: '#0369a1' })
+addTypes(EXTENSION_TYPES, ['eml', 'msg', 'emlx', 'mbx', 'mbox'], { icon: Mail, label: 'Email', color: '#3b82f6' })
+addTypes(EXTENSION_TYPES, ['pst', 'ost', 'olm'], { icon: Mail, label: 'Outlook', color: '#0078d4' })
+addTypes(EXTENSION_TYPES, ['vcf', 'vcard'], { icon: Mail, label: 'Contact', color: '#10b981' })
+addTypes(EXTENSION_TYPES, ['ics', 'ical', 'ifb', 'icalendar'], { icon: FileText, label: 'Calendar', color: '#f59e0b' })
+addTypes(EXTENSION_TYPES, ['exe', 'msi', 'msix', 'appx', 'app', 'run', 'out', 'com'], { icon: Zap, label: 'Executable', color: '#dc2626' })
+addTypes(EXTENSION_TYPES, ['so', 'dylib', 'framework', 'lib', 'a', 'o', 'obj', 'ko'], { icon: Binary, label: 'Library', color: '#9333ea' })
+addTypes(EXTENSION_TYPES, ['sys', 'drv', 'vxd'], { icon: Binary, label: 'Driver', color: '#7c3aed' })
+addTypes(EXTENSION_TYPES, ['bin', 'dat', 'dump', 'core', 'dmp'], { icon: Binary, label: 'Binary', color: '#6b7280' })
+addTypes(EXTENSION_TYPES, ['pem', 'crt', 'cer', 'ca-bundle', 'p7b', 'p7c', 'p7s', 'pfx', 'p12', 'der'], { icon: Lock, label: 'Certificate', color: '#15803d' })
+addTypes(EXTENSION_TYPES, ['key', 'pub', 'priv', 'private'], { icon: FileKey, label: 'Key', color: '#b91c1c' })
+addTypes(EXTENSION_TYPES, ['gpg', 'pgp', 'asc', 'sig', 'sign'], { icon: Lock, label: 'Encryption', color: '#166534' })
+addTypes(EXTENSION_TYPES, ['csr', 'crl', 'spc', 'keystore', 'jks', 'truststore'], { icon: Lock, label: 'Security', color: '#15803d' })
+addTypes(EXTENSION_TYPES, ['whl', 'egg', 'pyz', 'pex'], { icon: Package, label: 'Python Package', color: '#3776ab' })
+addTypes(EXTENSION_TYPES, ['gem', 'gemfile'], { icon: Package, label: 'Ruby Gem', color: '#cc342d' })
+addTypes(EXTENSION_TYPES, ['nupkg', 'snupkg'], { icon: Package, label: 'NuGet', color: '#004880' })
+addTypes(EXTENSION_TYPES, ['vsix'], { icon: Package, label: 'VS Extension', color: '#68217a' })
+addTypes(EXTENSION_TYPES, ['crx', 'xpi'], { icon: Package, label: 'Browser Ext', color: '#4285f4' })
+addTypes(EXTENSION_TYPES, ['vmdk', 'vdi', 'vhd', 'vhdx', 'hdd', 'qcow', 'qcow2', 'vbox'], { icon: HardDrive, label: 'Virtual Disk', color: '#7c3aed' })
+addTypes(EXTENSION_TYPES, ['ova', 'ovf', 'vbox-extpack', 'vbox-prev'], { icon: Server, label: 'VM', color: '#6366f1' })
+addTypes(EXTENSION_TYPES, ['obj', 'mtl', 'fbx', 'dae', 'collada', '3ds', 'max', 'blend', 'blend1', 'ma', 'mb', 'c4d'], { icon: Shapes, label: '3D Model', color: '#f59e0b' })
+addTypes(EXTENSION_TYPES, ['gltf', 'glb', 'usdz', 'usda', 'usdc', 'usd'], { icon: Shapes, label: '3D Web', color: '#fb923c' })
+addTypes(EXTENSION_TYPES, ['stl', 'ply', 'off', 'x3d', 'wrl', 'vrml'], { icon: Blocks, label: '3D Print', color: '#f97316' })
+addTypes(EXTENSION_TYPES, ['dwg', 'dxf', 'dwf', 'dwt'], { icon: Blocks, label: 'AutoCAD', color: '#ef4444' })
+addTypes(EXTENSION_TYPES, ['step', 'stp', 'iges', 'igs', 'sat', 'brep'], { icon: Blocks, label: 'CAD', color: '#dc2626' })
+addTypes(EXTENSION_TYPES, ['ipt', 'iam', 'idw'], { icon: Blocks, label: 'Inventor', color: '#f87171' })
+addTypes(EXTENSION_TYPES, ['prt', 'asm', 'drw', 'sldprt', 'sldasm', 'slddrw'], { icon: Blocks, label: 'SolidWorks', color: '#f43f5e' })
+addTypes(EXTENSION_TYPES, ['ttf', 'otf', 'woff', 'woff2', 'eot', 'fon', 'fnt', 'ttc', 'dfont'], { icon: FileType, label: 'Font', color: '#4b5563' })
+addTypes(EXTENSION_TYPES, ['unity', 'unitypackage', 'prefab', 'mat', 'asset'], { icon: Puzzle, label: 'Unity', color: '#000000' })
+addTypes(EXTENSION_TYPES, ['uasset', 'umap', 'upk'], { icon: Puzzle, label: 'Unreal', color: '#313131' })
+addTypes(EXTENSION_TYPES, ['pak', 'vpk', 'wad', 'bsp', 'pk3'], { icon: Archive, label: 'Game Asset', color: '#7c3aed' })
+addTypes(EXTENSION_TYPES, ['sol'], { icon: FileCode, label: 'Solidity', color: '#363636' })
+addTypes(EXTENSION_TYPES, ['wallet', 'keystore'], { icon: Lock, label: 'Wallet', color: '#f59e0b' })
+
+const FOLDER_TYPE: FileTypeInfo = { icon: Folder, label: 'Folder', color: '#60a5fa' }
+const FILE_TYPE: FileTypeInfo = { icon: File, label: 'File', color: '#9ca3af' }
+
 export function getFileTypeInfo(fileName: string, isDirectory: boolean): FileTypeInfo {
   if (isDirectory) {
-    // 特殊資料夾
-    if (fileName === '.git') {
-      return { icon: FolderGit2, label: 'Git Repository', color: '#f05033' }
-    }
-    if (['node_modules', 'vendor', 'packages', 'bower_components', '.venv', 'venv', '__pycache__'].includes(fileName)) {
-      return { icon: Box, label: 'Dependencies', color: '#8b5cf6' }
-    }
-    if (['.vscode', '.idea', '.vs'].includes(fileName)) {
-      return { icon: Settings, label: 'IDE Config', color: '#0078d7' }
-    }
-    if (['.github', '.gitlab', '.circleci'].includes(fileName)) {
-      return { icon: Workflow, label: 'CI/CD', color: '#2088ff' }
-    }
-    if (['dist', 'build', 'out', 'target', 'bin'].includes(fileName)) {
-      return { icon: Package2, label: 'Build Output', color: '#f59e0b' }
-    }
-    if (['src', 'source', 'app', 'lib', 'components'].includes(fileName)) {
-      return { icon: Code2, label: 'Source', color: '#3b82f6' }
-    }
-    if (['test', 'tests', '__tests__', 'spec', 'specs'].includes(fileName)) {
-      return { icon: FileStack, label: 'Tests', color: '#10b981' }
-    }
-    if (['docs', 'doc', 'documentation'].includes(fileName)) {
-      return { icon: BookOpen, label: 'Documentation', color: '#6366f1' }
-    }
-    if (['assets', 'static', 'public', 'resources'].includes(fileName)) {
-      return { icon: Image, label: 'Assets', color: '#ec4899' }
-    }
-    return { icon: Folder, label: 'Folder', color: '#60a5fa' }
+    return DIRECTORY_TYPES.get(fileName) ?? FOLDER_TYPE
   }
 
-  const ext = fileName.split('.').pop()?.toLowerCase() || ''
   const fullName = fileName.toLowerCase()
+  const named = NAME_TYPES.get(fullName)
+  if (named) return named
 
-  // 特殊檔案名稱 (無副檔名)
-  if (['dockerfile', 'containerfile'].includes(fullName)) {
-    return { icon: Container, label: 'Docker', color: '#2496ed' }
-  }
-  if (['makefile', 'rakefile', 'gemfile', 'podfile', 'vagrantfile', 'gruntfile', 'gulpfile'].includes(fullName)) {
-    return { icon: Settings, label: 'Build Config', color: '#2496ed' }
-  }
-  if (['license', 'licence', 'readme', 'changelog', 'contributing', 'authors', 'notice'].includes(fullName)) {
-    return { icon: FileText, label: 'Documentation', color: '#6b7280' }
-  }
-  if (['.gitignore', '.dockerignore', '.npmignore', '.eslintignore', '.prettierignore'].includes(fullName)) {
-    return { icon: GitBranch, label: 'Ignore File', color: '#6b7280' }
-  }
-  if (['.env', '.env.local', '.env.development', '.env.production', '.env.test'].includes(fullName)) {
-    return { icon: Lock, label: 'Environment', color: '#eab308' }
-  }
-  if (['package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'].includes(fullName)) {
-    return { icon: Package, label: 'Package Config', color: '#10b981' }
-  }
-  if (['tsconfig.json', 'jsconfig.json'].includes(fullName)) {
-    return { icon: Settings, label: 'TS Config', color: '#3178c6' }
-  }
-  if (['.eslintrc', '.eslintrc.js', '.eslintrc.json', '.prettierrc'].includes(fullName)) {
-    return { icon: Settings, label: 'Linter Config', color: '#4b32c3' }
-  }
-
-  // 圖片 - 點陣圖
-  if (['jpg', 'jpeg', 'jpe', 'jfif', 'png', 'gif', 'bmp', 'dib', 'webp', 'ico', 'cur', 'tiff', 'tif', 'ppm', 'pgm', 'pbm', 'pnm'].includes(ext)) {
-    return { icon: Image, label: 'Image', color: '#f472b6' }
-  }
-  // 圖片 - 向量圖與設計
-  if (['svg', 'svgz', 'ai', 'eps', 'ps', 'cdr', 'cgm', 'wmf', 'emf'].includes(ext)) {
-    return { icon: Pen, label: 'Vector', color: '#ec4899' }
-  }
-  // 圖片 - 專業設計軟體
-  if (['psd', 'psb', 'xcf', 'kra', 'sketch', 'xd', 'fig', 'figma', 'afdesign', 'afphoto', 'clip'].includes(ext)) {
-    return { icon: Palette, label: 'Design', color: '#ec4899' }
-  }
-  // 圖片 - RAW 格式
-  if (['raw', 'cr2', 'cr3', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 'raf', 'dcr', 'mrw', 'nrw', 'rwl', 'srw', 'x3f'].includes(ext)) {
-    return { icon: Camera, label: 'RAW Image', color: '#f59e0b' }
-  }
-
-  // 影片 - 常見格式
-  if (['mp4', 'm4v', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'mpg', 'mpeg', 'mpe', 'mpv', 'm2v', '3gp', '3g2', 'ogv', 'ogg', 'vob', 'divx'].includes(ext)) {
-    return { icon: Video, label: 'Video', color: '#8b5cf6' }
-  }
-  // 影片 - 專業格式
-  if (['mxf', 'ts', 'm2ts', 'mts', 'f4v', 'swf', 'rm', 'rmvb', 'asf', 'qt', 'yuv', 'y4m', 'amv'].includes(ext)) {
-    return { icon: FileVideo, label: 'Video', color: '#8b5cf6' }
-  }
-  // 影片 - 專案檔
-  if (['prproj', 'aep', 'veg', 'fcpx', 'motn', 'imovieproj', 'davinci'].includes(ext)) {
-    return { icon: Film, label: 'Video Project', color: '#7c3aed' }
-  }
-
-  // 音訊 - 無損格式
-  if (['flac', 'ape', 'alac', 'wav', 'aiff', 'aif', 'aifc', 'au', 'snd', 'pcm', 'dsd', 'dsf', 'dff'].includes(ext)) {
-    return { icon: Volume2, label: 'Audio', color: '#a855f7' }
-  }
-  // 音訊 - 有損格式
-  if (['mp3', 'aac', 'm4a', 'ogg', 'oga', 'opus', 'wma', 'mka', 'ra', 'ram', 'voc', 'amr', 'awb'].includes(ext)) {
-    return { icon: Music2, label: 'Audio', color: '#a855f7' }
-  }
-  // 音訊 - MIDI 與合成
-  if (['mid', 'midi', 'kar', 'rmi', 'mus', 'syx'].includes(ext)) {
-    return { icon: Music2, label: 'MIDI', color: '#c084fc' }
-  }
-  // 音訊 - 專案檔
-  if (['flp', 'als', 'ptx', 'logic', 'band', 'reason', 'cpr', 'cwp', 'sesx', 'aup', 'aup3'].includes(ext)) {
-    return { icon: Mic, label: 'Audio Project', color: '#9333ea' }
-  }
-
-  // 壓縮檔 - 常見格式
-  if (['zip', 'rar', '7z', 'tar', 'gz', 'gzip', 'bz2', 'bzip2', 'xz', 'lz', 'lzma', 'z', 'tgz', 'tbz', 'tbz2', 'txz', 'tlz'].includes(ext)) {
-    return { icon: Archive, label: 'Archive', color: '#f59e0b' }
-  }
-  // 壓縮檔 - 光碟映像
-  if (['iso', 'img', 'dmg', 'toast', 'vcd', 'cue', 'bin', 'mdf', 'mds', 'nrg', 'cdi', 'b5t', 'b6t', 'bwt', 'ccd', 'isz', 'uif'].includes(ext)) {
-    return { icon: HardDrive, label: 'Disk Image', color: '#fb923c' }
-  }
-  // 壓縮檔 - 安裝包
-  if (['pkg', 'deb', 'rpm', 'apk', 'msi', 'msix', 'appx', 'snap', 'flatpak', 'appimage'].includes(ext)) {
-    return { icon: PackageOpen, label: 'Package', color: '#f59e0b' }
-  }
-  // 壓縮檔 - 其他
-  if (['cab', 'arj', 'lzh', 'ace', 'zoo', 'arc', 'pak', 'sit', 'sitx', 'sea', 'uue', 'uu'].includes(ext)) {
-    return { icon: Archive, label: 'Archive', color: '#f59e0b' }
-  }
-
-  // 程式碼 - JavaScript/TypeScript 生態系
-  if (['js', 'jsx', 'mjs', 'cjs', 'es6', 'es'].includes(ext)) {
-    return { icon: FileCode, label: 'JavaScript', color: '#f7df1e' }
-  }
-  if (['ts', 'tsx', 'mts', 'cts'].includes(ext)) {
-    return { icon: FileCode, label: 'TypeScript', color: '#3178c6' }
-  }
-  if (['vue', 'svelte', 'astro'].includes(ext)) {
-    return { icon: Puzzle, label: 'Component', color: '#42b883' }
-  }
-
-  // 程式碼 - Web 前端
-  if (['html', 'htm', 'xhtml', 'shtml', 'dhtml', 'hta'].includes(ext)) {
-    return { icon: Globe, label: 'HTML', color: '#e34c26' }
-  }
-  if (['css', 'scss', 'sass', 'less', 'styl', 'stylus', 'pcss', 'postcss'].includes(ext)) {
-    return { icon: Palette, label: 'Stylesheet', color: '#264de4' }
-  }
-  if (['wasm', 'wat'].includes(ext)) {
-    return { icon: Cpu, label: 'WebAssembly', color: '#654ff0' }
-  }
-
-  // 程式碼 - Python
-  if (['py', 'pyw', 'pyx', 'pyd', 'pyi', 'pyc', 'pyo', 'pyz', 'pyzw'].includes(ext)) {
-    return { icon: FileCode, label: 'Python', color: '#3776ab' }
-  }
-  if (['ipynb', 'jupyter'].includes(ext)) {
-    return { icon: FileStack, label: 'Jupyter', color: '#f37726' }
-  }
-
-  // 程式碼 - Java 系列
-  if (['java', 'jsp', 'jspx'].includes(ext)) {
-    return { icon: FileCode, label: 'Java', color: '#f89820' }
-  }
-  if (['class', 'jar', 'war', 'ear', 'jad'].includes(ext)) {
-    return { icon: Archive, label: 'Java Binary', color: '#f89820' }
-  }
-  if (['kt', 'kts', 'ktm'].includes(ext)) {
-    return { icon: FileCode, label: 'Kotlin', color: '#7f52ff' }
-  }
-  if (['scala', 'sc'].includes(ext)) {
-    return { icon: FileCode, label: 'Scala', color: '#dc322f' }
-  }
-  if (['groovy', 'gvy', 'gradle'].includes(ext)) {
-    return { icon: FileCode, label: 'Groovy', color: '#4298b8' }
-  }
-
-  // 程式碼 - C/C++
-  if (['c', 'h', 'i'].includes(ext)) {
-    return { icon: FileCode, label: 'C', color: '#555555' }
-  }
-  if (['cpp', 'cc', 'cxx', 'c++', 'hpp', 'hh', 'hxx', 'h++', 'ii', 'ipp', 'tcc', 'tpp'].includes(ext)) {
-    return { icon: FileCode, label: 'C++', color: '#f34b7d' }
-  }
-  if (['m', 'mm'].includes(ext)) {
-    return { icon: FileCode, label: 'Objective-C', color: '#438eff' }
-  }
-
-  // 程式碼 - .NET
-  if (['cs', 'csx', 'cshtml', 'razor'].includes(ext)) {
-    return { icon: FileCode, label: 'C#', color: '#239120' }
-  }
-  if (['vb', 'vbs', 'vba', 'bas'].includes(ext)) {
-    return { icon: FileCode, label: 'Visual Basic', color: '#945db7' }
-  }
-  if (['fs', 'fsi', 'fsx', 'fsscript'].includes(ext)) {
-    return { icon: FileCode, label: 'F#', color: '#b845fc' }
-  }
-  if (['dll', 'pdb', 'winmd'].includes(ext)) {
-    return { icon: Binary, label: '.NET Binary', color: '#512bd4' }
-  }
-
-  // 程式碼 - 系統語言
-  if (['rs', 'rlib'].includes(ext)) {
-    return { icon: FileCode, label: 'Rust', color: '#ce422b' }
-  }
-  if (['go', 'mod', 'sum'].includes(ext)) {
-    return { icon: FileCode, label: 'Go', color: '#00add8' }
-  }
-  if (['zig'].includes(ext)) {
-    return { icon: FileCode, label: 'Zig', color: '#f7a41d' }
-  }
-  if (['v'].includes(ext)) {
-    return { icon: FileCode, label: 'V', color: '#5d87bd' }
-  }
-  if (['nim', 'nims', 'nimble'].includes(ext)) {
-    return { icon: FileCode, label: 'Nim', color: '#ffe953' }
-  }
-
-  // 程式碼 - 腳本語言
-  if (['php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'phps', 'phar'].includes(ext)) {
-    return { icon: FileCode, label: 'PHP', color: '#777bb4' }
-  }
-  if (['rb', 'rbw', 'rake', 'erb', 'gemspec', 'ru'].includes(ext)) {
-    return { icon: FileCode, label: 'Ruby', color: '#cc342d' }
-  }
-  if (['pl', 'pm', 'pod', 'perl'].includes(ext)) {
-    return { icon: FileCode, label: 'Perl', color: '#0298c3' }
-  }
-  if (['lua'].includes(ext)) {
-    return { icon: FileCode, label: 'Lua', color: '#000080' }
-  }
-  if (['r', 'rdata', 'rds', 'rmd'].includes(ext)) {
-    return { icon: FileCode, label: 'R', color: '#198ce7' }
-  }
-
-  // 程式碼 - Shell
-  if (['sh', 'bash', 'zsh', 'fish', 'ksh', 'csh', 'tcsh'].includes(ext)) {
-    return { icon: Terminal, label: 'Shell', color: '#4eaa25' }
-  }
-  if (['bat', 'cmd', 'btm'].includes(ext)) {
-    return { icon: Terminal, label: 'Batch', color: '#c1f12e' }
-  }
-  if (['ps1', 'psm1', 'psd1', 'ps1xml'].includes(ext)) {
-    return { icon: Terminal, label: 'PowerShell', color: '#012456' }
-  }
-
-  // 程式碼 - 函數式語言
-  if (['hs', 'lhs'].includes(ext)) {
-    return { icon: FileCode, label: 'Haskell', color: '#5e5086' }
-  }
-  if (['ml', 'mli', 'mll', 'mly'].includes(ext)) {
-    return { icon: FileCode, label: 'OCaml', color: '#3be133' }
-  }
-  if (['ex', 'exs', 'eex', 'leex'].includes(ext)) {
-    return { icon: FileCode, label: 'Elixir', color: '#6e4a7e' }
-  }
-  if (['erl', 'hrl'].includes(ext)) {
-    return { icon: FileCode, label: 'Erlang', color: '#b83998' }
-  }
-  if (['clj', 'cljs', 'cljc', 'edn'].includes(ext)) {
-    return { icon: FileCode, label: 'Clojure', color: '#db5855' }
-  }
-  if (['lisp', 'lsp', 'l', 'cl', 'el'].includes(ext)) {
-    return { icon: FileCode, label: 'Lisp', color: '#3fb68b' }
-  }
-  if (['scm', 'ss', 'rkt'].includes(ext)) {
-    return { icon: FileCode, label: 'Scheme', color: '#1e4aec' }
-  }
-
-  // 程式碼 - 其他語言
-  if (['swift'].includes(ext)) {
-    return { icon: FileCode, label: 'Swift', color: '#f05138' }
-  }
-  if (['dart'].includes(ext)) {
-    return { icon: FileCode, label: 'Dart', color: '#00b4ab' }
-  }
-  if (['jl'].includes(ext)) {
-    return { icon: FileCode, label: 'Julia', color: '#9558b2' }
-  }
-  if (['d', 'di'].includes(ext)) {
-    return { icon: FileCode, label: 'D', color: '#ba595e' }
-  }
-  if (['pas', 'pp', 'dpr'].includes(ext)) {
-    return { icon: FileCode, label: 'Pascal', color: '#e3f171' }
-  }
-  if (['f', 'f90', 'f95', 'f03', 'f08', 'for', 'ftn', 'fpp'].includes(ext)) {
-    return { icon: FileCode, label: 'Fortran', color: '#734f96' }
-  }
-  if (['cob', 'cbl', 'cpy'].includes(ext)) {
-    return { icon: FileCode, label: 'COBOL', color: '#555555' }
-  }
-  if (['ada', 'adb', 'ads'].includes(ext)) {
-    return { icon: FileCode, label: 'Ada', color: '#02f88c' }
-  }
-  if (['asm', 's', 'nasm'].includes(ext)) {
-    return { icon: Cpu, label: 'Assembly', color: '#6e4c13' }
-  }
-
-  // 資料格式 - 結構化資料
-  if (['json', 'jsonc', 'json5', 'geojson', 'topojson'].includes(ext)) {
-    return { icon: FileJson, label: 'JSON', color: '#10b981' }
-  }
-  if (['xml', 'xsl', 'xslt', 'xsd', 'dtd', 'rss', 'atom', 'plist', 'xaml', 'xul', 'xbl'].includes(ext)) {
-    return { icon: Braces, label: 'XML', color: '#f97316' }
-  }
-  if (['yaml', 'yml'].includes(ext)) {
-    return { icon: FileType, label: 'YAML', color: '#ef4444' }
-  }
-  if (['toml'].includes(ext)) {
-    return { icon: Settings, label: 'TOML', color: '#9c4221' }
-  }
-  if (['ini', 'inf', 'conf', 'config', 'cfg', 'properties', 'prop'].includes(ext)) {
-    return { icon: Settings, label: 'Config', color: '#6b7280' }
-  }
-  if (['csv', 'tsv', 'tab', 'psv'].includes(ext)) {
-    return { icon: Sheet, label: 'Data', color: '#059669' }
-  }
-  if (['parquet', 'avro', 'orc', 'arrow'].includes(ext)) {
-    return { icon: Database, label: 'Big Data', color: '#0891b2' }
-  }
-
-  // 文件 - 純文字
-  if (['txt', 'text', 'log', 'out', 'err'].includes(ext)) {
-    return { icon: FileText, label: 'Text', color: '#6b7280' }
-  }
-  if (['md', 'markdown', 'mdown', 'mkd', 'mdwn', 'mdtxt', 'mdtext', 'mdx'].includes(ext)) {
-    return { icon: BookOpen, label: 'Markdown', color: '#083344' }
-  }
-  if (['rst', 'rest'].includes(ext)) {
-    return { icon: BookOpen, label: 'reStructuredText', color: '#141414' }
-  }
-  if (['tex', 'latex', 'ltx', 'bib', 'sty', 'cls'].includes(ext)) {
-    return { icon: FileText, label: 'LaTeX', color: '#008080' }
-  }
-  if (['adoc', 'asciidoc', 'asc'].includes(ext)) {
-    return { icon: BookOpen, label: 'AsciiDoc', color: '#e40046' }
-  }
-  if (['org'].includes(ext)) {
-    return { icon: BookOpen, label: 'Org Mode', color: '#77aa99' }
-  }
-
-  // 文件 - 辦公室文件
-  if (['pdf'].includes(ext)) {
-    return { icon: FileText, label: 'PDF', color: '#dc2626' }
-  }
-  if (['doc', 'docx', 'docm', 'dot', 'dotx', 'dotm', 'odt', 'ott', 'rtf', 'wps'].includes(ext)) {
-    return { icon: FileText, label: 'Document', color: '#2563eb' }
-  }
-  if (['xls', 'xlsx', 'xlsm', 'xlsb', 'xlt', 'xltx', 'xltm', 'ods', 'ots', 'numbers'].includes(ext)) {
-    return { icon: FileSpreadsheet, label: 'Spreadsheet', color: '#16a34a' }
-  }
-  if (['ppt', 'pptx', 'pptm', 'pot', 'potx', 'potm', 'pps', 'ppsx', 'ppsm', 'odp', 'otp', 'key'].includes(ext)) {
-    return { icon: Presentation, label: 'Presentation', color: '#ea580c' }
-  }
-  if (['epub', 'mobi', 'azw', 'azw3', 'fb2', 'djvu'].includes(ext)) {
-    return { icon: BookOpen, label: 'eBook', color: '#7c3aed' }
-  }
-
-  // 資料庫
-  if (['db', 'sqlite', 'sqlite3', 'db3', 's3db', 'sl3'].includes(ext)) {
-    return { icon: Database, label: 'SQLite', color: '#0ea5e9' }
-  }
-  if (['sql', 'mysql', 'pgsql', 'psql', 'plsql'].includes(ext)) {
-    return { icon: Database, label: 'SQL', color: '#0891b2' }
-  }
-  if (['mdb', 'accdb', 'accde', 'accdt', 'accdr'].includes(ext)) {
-    return { icon: Database, label: 'Access', color: '#a50e0e' }
-  }
-  if (['dbf', 'dbc', 'fpt'].includes(ext)) {
-    return { icon: Database, label: 'dBASE', color: '#0369a1' }
-  }
-
-  // 郵件與通訊
-  if (['eml', 'msg', 'emlx', 'mbx', 'mbox'].includes(ext)) {
-    return { icon: Mail, label: 'Email', color: '#3b82f6' }
-  }
-  if (['pst', 'ost', 'olm'].includes(ext)) {
-    return { icon: Mail, label: 'Outlook', color: '#0078d4' }
-  }
-  if (['vcf', 'vcard'].includes(ext)) {
-    return { icon: Mail, label: 'Contact', color: '#10b981' }
-  }
-  if (['ics', 'ical', 'ifb', 'icalendar'].includes(ext)) {
-    return { icon: FileText, label: 'Calendar', color: '#f59e0b' }
-  }
-
-  // 執行檔與二進位
-  if (['exe', 'msi', 'msix', 'appx', 'app', 'run', 'out', 'com'].includes(ext)) {
-    return { icon: Zap, label: 'Executable', color: '#dc2626' }
-  }
-  if (['so', 'dylib', 'framework', 'lib', 'a', 'o', 'obj', 'ko'].includes(ext)) {
-    return { icon: Binary, label: 'Library', color: '#9333ea' }
-  }
-  if (['sys', 'drv', 'vxd'].includes(ext)) {
-    return { icon: Binary, label: 'Driver', color: '#7c3aed' }
-  }
-  if (['bin', 'dat', 'dump', 'core', 'dmp'].includes(ext)) {
-    return { icon: Binary, label: 'Binary', color: '#6b7280' }
-  }
-
-  // 憑證、金鑰與安全
-  if (['pem', 'crt', 'cer', 'ca-bundle', 'p7b', 'p7c', 'p7s', 'pfx', 'p12', 'der'].includes(ext)) {
-    return { icon: Lock, label: 'Certificate', color: '#15803d' }
-  }
-  if (['key', 'pub', 'priv', 'private'].includes(ext)) {
-    return { icon: FileKey, label: 'Key', color: '#b91c1c' }
-  }
-  if (['gpg', 'pgp', 'asc', 'sig', 'sign'].includes(ext)) {
-    return { icon: Lock, label: 'Encryption', color: '#166534' }
-  }
-  if (['csr', 'crl', 'spc', 'keystore', 'jks', 'truststore'].includes(ext)) {
-    return { icon: Lock, label: 'Security', color: '#15803d' }
-  }
-
-  // 套件管理
-  if (['whl', 'egg', 'pyz', 'pex'].includes(ext)) {
-    return { icon: Package, label: 'Python Package', color: '#3776ab' }
-  }
-  if (['gem', 'gemfile'].includes(ext)) {
-    return { icon: Package, label: 'Ruby Gem', color: '#cc342d' }
-  }
-  if (['nupkg', 'snupkg'].includes(ext)) {
-    return { icon: Package, label: 'NuGet', color: '#004880' }
-  }
-  if (['vsix'].includes(ext)) {
-    return { icon: Package, label: 'VS Extension', color: '#68217a' }
-  }
-  if (['crx', 'xpi'].includes(ext)) {
-    return { icon: Package, label: 'Browser Ext', color: '#4285f4' }
-  }
-
-  // 容器與虛擬化
-  if (['dockerfile', 'containerfile', '.dockerignore'].includes(fullName)) {
-    return { icon: Container, label: 'Docker', color: '#2496ed' }
-  }
-  if (['vmdk', 'vdi', 'vhd', 'vhdx', 'hdd', 'qcow', 'qcow2', 'vbox'].includes(ext)) {
-    return { icon: HardDrive, label: 'Virtual Disk', color: '#7c3aed' }
-  }
-  if (['ova', 'ovf', 'vbox-extpack', 'vbox-prev'].includes(ext)) {
-    return { icon: Server, label: 'VM', color: '#6366f1' }
-  }
-
-  // 3D 模型
-  if (['obj', 'mtl', 'fbx', 'dae', 'collada', '3ds', 'max', 'blend', 'blend1', 'ma', 'mb', 'c4d'].includes(ext)) {
-    return { icon: Shapes, label: '3D Model', color: '#f59e0b' }
-  }
-  if (['gltf', 'glb', 'usdz', 'usda', 'usdc', 'usd'].includes(ext)) {
-    return { icon: Shapes, label: '3D Web', color: '#fb923c' }
-  }
-  if (['stl', 'ply', 'off', 'x3d', 'wrl', 'vrml'].includes(ext)) {
-    return { icon: Blocks, label: '3D Print', color: '#f97316' }
-  }
-
-  // CAD 與工程
-  if (['dwg', 'dxf', 'dwf', 'dwt'].includes(ext)) {
-    return { icon: Blocks, label: 'AutoCAD', color: '#ef4444' }
-  }
-  if (['step', 'stp', 'iges', 'igs', 'sat', 'brep'].includes(ext)) {
-    return { icon: Blocks, label: 'CAD', color: '#dc2626' }
-  }
-  if (['ipt', 'iam', 'idw'].includes(ext)) {
-    return { icon: Blocks, label: 'Inventor', color: '#f87171' }
-  }
-  if (['prt', 'asm', 'drw', 'sldprt', 'sldasm', 'slddrw'].includes(ext)) {
-    return { icon: Blocks, label: 'SolidWorks', color: '#f43f5e' }
-  }
-
-  // 字型
-  if (['ttf', 'otf', 'woff', 'woff2', 'eot', 'fon', 'fnt', 'ttc', 'dfont'].includes(ext)) {
-    return { icon: FileType, label: 'Font', color: '#4b5563' }
-  }
-
-  // 遊戲相關
-  if (['unity', 'unitypackage', 'prefab', 'mat', 'asset'].includes(ext)) {
-    return { icon: Puzzle, label: 'Unity', color: '#000000' }
-  }
-  if (['uasset', 'umap', 'upk'].includes(ext)) {
-    return { icon: Puzzle, label: 'Unreal', color: '#313131' }
-  }
-  if (['pak', 'vpk', 'wad', 'bsp', 'pk3'].includes(ext)) {
-    return { icon: Archive, label: 'Game Asset', color: '#7c3aed' }
-  }
-
-  // 區塊鏈與加密貨幣
-  if (['sol'].includes(ext)) {
-    return { icon: FileCode, label: 'Solidity', color: '#363636' }
-  }
-  if (['wallet', 'keystore'].includes(ext)) {
-    return { icon: Lock, label: 'Wallet', color: '#f59e0b' }
-  }
-
-  return { icon: File, label: 'File', color: '#9ca3af' }
+  const ext = (fileName.split('.').pop() || '').toLowerCase()
+  return EXTENSION_TYPES.get(ext) ?? FILE_TYPE
 }

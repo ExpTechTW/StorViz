@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { open } from '@tauri-apps/plugin-dialog'
 import { join, resourceDir } from '@tauri-apps/api/path'
 import { convertFileSrc, isTauri } from '@tauri-apps/api/core'
 import { FolderOpen, HardDrive, BarChart3, Shield, Eye, Layers, ArrowLeft } from 'lucide-react'
 import { StatsDisplay } from '@/components/StatsDisplay'
+import { CursorGlow } from '@/components/CursorGlow'
 import { useTranslation } from 'react-i18next'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 
@@ -39,7 +40,6 @@ export default function HomePage() {
   const { t } = useTranslation()
   const [selectedPath, setSelectedPath] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
   // 縮短路徑顯示 - 智能省略，保留開頭和最後兩個資料夾
   const getDisplayPath = (path: string) => {
@@ -68,24 +68,6 @@ export default function HomePage() {
     { icon: <Layers className="w-3 h-3 text-primary" />, title: t('home.features.hierarchy'), description: t('home.features.hierarchyDesc') },
     { icon: <Shield className="w-3 h-3 text-primary" />, title: t('home.features.security'), description: t('home.features.securityDesc') }
   ]
-
-  // Mouse tracking for cursor glow effect
-  useEffect(() => {
-    let animationFrame: number
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (animationFrame) cancelAnimationFrame(animationFrame)
-      animationFrame = requestAnimationFrame(() => {
-        setMousePosition({ x: e.clientX, y: e.clientY })
-      })
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      if (animationFrame) cancelAnimationFrame(animationFrame)
-    }
-  }, [])
 
   // Audio playback helper (Tauri only)
   const playAudio = async (audioFileName: string) => {
@@ -150,20 +132,7 @@ export default function HomePage() {
         <div className="absolute bottom-1/4 right-1/4 w-24 h-24 bg-primary/5 rounded-full blur-2xl animate-pulse delay-1000"></div>
       </div>
 
-      {/* Cursor Follow Glow - Bottom Layer */}
-      <div
-        className="fixed pointer-events-none z-10"
-        style={{
-          left: mousePosition.x - 150,
-          top: mousePosition.y - 150,
-          width: '300px',
-          height: '300px',
-          transform: 'translate3d(0, 0, 0)',
-          willChange: 'transform',
-        }}
-      >
-        <div className="w-full h-full bg-primary/8 rounded-full blur-3xl"></div>
-      </div>
+      <CursorGlow />
 
       <div className="relative z-10" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
         {/* Header */}

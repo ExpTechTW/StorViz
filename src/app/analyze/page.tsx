@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, Suspense } from 'react'
+import { useEffect, useState, useRef, useMemo, useLayoutEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, X, ArrowUpDown } from 'lucide-react'
 import { invoke, Channel } from '@tauri-apps/api/core'
@@ -11,6 +11,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { useTranslation } from 'react-i18next'
+import { CursorGlow } from '@/components/CursorGlow'
 
 interface FileNode {
   name: string
@@ -61,48 +62,27 @@ function hashName(name: string): number {
   return Math.abs(hash)
 }
 
-// Generate HSL color based on hash
-function generateColorFromHash(name: string, depth: number = 0): string {
-  const hash = hashName(name)
-  
-  // Generate hue from hash (0-360)
-  const hue = hash % 360
-  
-  // Generate saturation and lightness based on depth
-  // Deeper levels have lower saturation and higher lightness (lighter colors)
-  const saturation = Math.max(20, 80 - depth * 15) // 80% to 20%
-  const lightness = Math.min(80, 40 + depth * 8) // 40% to 80%
-  
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`
+type Hsl = { h: number; s: number; l: number }
+
+function hue2rgb(p: number, q: number, t: number): number {
+  if (t < 0) t += 1
+  if (t > 1) t -= 1
+  if (t < 1/6) return p + (q - p) * 6 * t
+  if (t < 1/2) return q
+  if (t < 2/3) return p + (q - p) * (2/3 - t) * 6
+  return p
 }
 
-// Mix color with white based on depth
-function mixColorWithWhite(baseColor: string, depth: number): string {
-  // Convert HSL to RGB for mixing
-  const hslMatch = baseColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/)
-  if (!hslMatch) return baseColor
-  
-  const hue = parseInt(hslMatch[1])
-  const saturation = parseInt(hslMatch[2])
-  const lightness = parseInt(hslMatch[3])
-  
-  // Convert HSL to RGB
+function mixHslWithWhite(hue: number, saturation: number, lightness: number, depth: number): Hsl {
   const h = hue / 360
   const s = saturation / 100
   const l = lightness / 100
-  
-  const hue2rgb = (p: number, q: number, t: number) => {
-    if (t < 0) t += 1
-    if (t > 1) t -= 1
-    if (t < 1/6) return p + (q - p) * 6 * t
-    if (t < 1/2) return q
-    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6
-    return p
-  }
-  
-  let r, g, b
+
+  let r: number
+  let g: number
+  let b: number
   if (s === 0) {
-    r = g = b = l // achromatic
+    r = g = b = l
   } else {
     const q = l < 0.5 ? l * (1 + s) : l + s - l * s
     const p = 2 * l - q
@@ -110,24 +90,22 @@ function mixColorWithWhite(baseColor: string, depth: number): string {
     g = hue2rgb(p, q, h)
     b = hue2rgb(p, q, h - 1/3)
   }
-  
-  // Mix with white based on depth (more white = lighter)
-  const whiteAmount = Math.min(0.8, depth * 0.2) // Max 80% white at depth 4+
+
+  const whiteAmount = Math.min(0.8, depth * 0.2)
   r = r + (1 - r) * whiteAmount
   g = g + (1 - g) * whiteAmount
   b = b + (1 - b) * whiteAmount
-  
-  // Convert back to HSL
+
   const max = Math.max(r, g, b)
   const min = Math.min(r, g, b)
   let newHue = 0
   let newSaturation = 0
   const newLightness = (max + min) / 2
-  
+
   if (max !== min) {
     const d = max - min
     newSaturation = newLightness > 0.5 ? d / (2 - max - min) : d / (max + min)
-    
+
     switch (max) {
       case r: newHue = (g - b) / d + (g < b ? 6 : 0); break
       case g: newHue = (b - r) / d + 2; break
@@ -135,23 +113,45 @@ function mixColorWithWhite(baseColor: string, depth: number): string {
     }
     newHue /= 6
   }
-  
-  return `hsl(${Math.round(newHue * 360)}, ${Math.round(newSaturation * 100)}%, ${Math.round(newLightness * 100)}%)`
+
+  return {
+    h: Math.round(newHue * 360),
+    s: Math.round(newSaturation * 100),
+    l: Math.round(newLightness * 100),
+  }
 }
 
-// Generate color scheme for a name (base color + lighter variants)
-function generateColorScheme(name: string): string[] {
-  const hash = hashName(name)
-  const hue = hash % 360
-  
-  const schemes = []
-  for (let i = 0; i < 5; i++) {
-    const saturation = Math.max(20, 80 - i * 15)
-    const lightness = Math.min(80, 40 + i * 8)
-    schemes.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`)
+function formatHsl(h: number, s: number, l: number): string {
+  return `hsl(${h}, ${s}%, ${l}%)`
+}
+
+const MAX_MIX_DEPTH = 7
+
+const MIXED_COLOR_BY_HUE: string[][] = Array.from({ length: 360 }, (_, hue) => {
+  const chain = [formatHsl(hue, 80, 40)]
+  let current: Hsl = { h: hue, s: 80, l: 40 }
+  for (let depth = 1; depth <= MAX_MIX_DEPTH; depth++) {
+    current = mixHslWithWhite(current.h, current.s, current.l, depth)
+    chain.push(formatHsl(current.h, current.s, current.l))
   }
-  
-  return schemes
+  return chain
+})
+
+function colorFromHue(hue: number, depth: number): string {
+  if (depth <= MAX_MIX_DEPTH) return MIXED_COLOR_BY_HUE[hue][depth]
+  let current: Hsl = { h: hue, s: 80, l: 40 }
+  for (let d = 1; d <= depth; d++) {
+    current = mixHslWithWhite(current.h, current.s, current.l, d)
+  }
+  return formatHsl(current.h, current.s, current.l)
+}
+
+function generateColorFromHash(name: string, depth: number = 0): string {
+  const hue = hashName(name) % 360
+  if (depth === 0) return MIXED_COLOR_BY_HUE[hue][0]
+  const saturation = Math.max(20, 80 - depth * 15)
+  const lightness = Math.min(80, 40 + depth * 8)
+  return formatHsl(hue, saturation, lightness)
 }
 
 
@@ -276,7 +276,6 @@ function AnalyzeContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [scanProgress, setScanProgress] = useState<{ currentPath: string; filesScanned: number; scannedSize: number; estimatedTotal: number } | null>(null)
   const [diskInfo, setDiskInfo] = useState<{ totalSpace: number; availableSpace: number; usedSpace: number } | null>(null)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [scanStartTime, setScanStartTime] = useState<number | null>(null)
   const [scanElapsedTime, setScanElapsedTime] = useState<number>(0)
   const [scanCompleteTime, setScanCompleteTime] = useState<number | null>(null)
@@ -303,49 +302,47 @@ function AnalyzeContent() {
 
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoveredSectorId, setHoveredSectorId] = useState<string | null>(null)
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string; label: string; size: string; icon: any; color: string } | null>(null)
+  const [tooltip, setTooltip] = useState<{ content: string; label: string; size: string; icon: any; color: string } | null>(null)
 
-  // Hover handlers with smart positioning
   const tooltipRef = useRef<HTMLDivElement>(null)
+  const tooltipMouseRef = useRef({ x: 0, y: 0 })
   const listContainerRef = useRef<HTMLDivElement>(null)
 
-  const calculateTooltipPosition = (mouseX: number, mouseY: number) => {
+  const positionTooltip = (mouseX: number, mouseY: number) => {
+    const el = tooltipRef.current
+    if (!el) return
+
     const offsetX = 8
     const offsetY = 8
-
-    // Use actual tooltip dimensions if available, otherwise use estimates
-    const tooltipWidth = tooltipRef.current?.offsetWidth || 200
-    const tooltipHeight = tooltipRef.current?.offsetHeight || 70
-
-    // Check if mouse is on left or right half of screen
+    const tooltipWidth = el.offsetWidth || 200
+    const tooltipHeight = el.offsetHeight || 70
     const isLeftHalf = mouseX < window.innerWidth / 2
-    // Check if mouse is on top or bottom half of screen
     const isTopHalf = mouseY < window.innerHeight / 2
-
-    let x = isLeftHalf ? mouseX + offsetX : mouseX - tooltipWidth - offsetX
-    let y = isTopHalf ? mouseY + offsetY : mouseY - tooltipHeight - offsetY
-
-    return { x, y }
+    const x = isLeftHalf ? mouseX + offsetX : mouseX - tooltipWidth - offsetX
+    const y = isTopHalf ? mouseY + offsetY : mouseY - tooltipHeight - offsetY
+    el.style.left = `${x}px`
+    el.style.top = `${y}px`
   }
+
+  useLayoutEffect(() => {
+    if (!tooltip) return
+    positionTooltip(tooltipMouseRef.current.x, tooltipMouseRef.current.y)
+  }, [tooltip])
 
   const handleHover = (sectorId: string, event: React.MouseEvent, label: string, name: string, size: string, icon: any, color: string) => {
+    tooltipMouseRef.current = { x: event.clientX, y: event.clientY }
     setHoveredSectorId(sectorId)
-    const pos = calculateTooltipPosition(event.clientX, event.clientY)
-    setTooltip({
-      x: pos.x,
-      y: pos.y,
-      content: name,
-      label: label,
-      size: size,
-      icon: icon,
-      color: color
+    setTooltip(prev => {
+      if (prev && prev.content === name && prev.label === label && prev.size === size && prev.color === color && prev.icon === icon) {
+        return prev
+      }
+      return { content: name, label, size, icon, color }
     })
+    positionTooltip(event.clientX, event.clientY)
   }
   const handleMouseMove = (event: React.MouseEvent) => {
-    if (tooltip) {
-      const pos = calculateTooltipPosition(event.clientX, event.clientY)
-      setTooltip(prev => prev ? { ...prev, x: pos.x, y: pos.y } : null)
-    }
+    tooltipMouseRef.current = { x: event.clientX, y: event.clientY }
+    positionTooltip(event.clientX, event.clientY)
   }
   const handleLeave = () => {
     setHoveredSectorId(null)
@@ -593,24 +590,6 @@ function AnalyzeContent() {
     return filterNode(root) || root
   }
 
-  // Mouse tracking for cursor glow effect
-  useEffect(() => {
-    let animationFrame: number
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (animationFrame) cancelAnimationFrame(animationFrame)
-      animationFrame = requestAnimationFrame(() => {
-        setMousePosition({ x: e.clientX, y: e.clientY })
-      })
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      if (animationFrame) cancelAnimationFrame(animationFrame)
-    }
-  }, [])
-
   // Sync hover states between chart and file list
   useEffect(() => {
     if (!svgRef.current) return
@@ -803,7 +782,7 @@ function AnalyzeContent() {
       depth: number,
       startAngle: number,
       endAngle: number,
-      parentColor?: string
+      parentHue?: number
     ) => {
       if (depth >= maxDepth || !nodes || nodes.length === 0) return
 
@@ -826,11 +805,10 @@ function AnalyzeContent() {
           return
         }
 
-        // Get color for this node - use parent color mixed with white for deeper levels
-        const color = depth === 0 
+        const color = depth === 0
           ? generateColorFromHash(node.name, 0)
-          : parentColor 
-            ? mixColorWithWhite(parentColor, depth)
+          : parentHue !== undefined
+            ? colorFromHue(parentHue, depth)
             : generateColorFromHash(node.name, depth)
 
         // Add to current layer
@@ -855,7 +833,7 @@ function AnalyzeContent() {
             depth + 1,
             currentAngle,
             nodeEndAngle,
-            color
+            depth === 0 ? hashName(node.name) % 360 : parentHue
           )
         }
 
@@ -902,8 +880,8 @@ function AnalyzeContent() {
         const nodeAngleRange = 360 * proportion
         const nodeEndAngle = currentAngle + nodeAngleRange
 
-        // Generate color based on name hash
-        const color = generateColorFromHash(node.name, 0)
+        const hue = hashName(node.name) % 360
+        const color = MIXED_COLOR_BY_HUE[hue][0]
 
         if (!layers.has(0)) {
           layers.set(0, [])
@@ -921,7 +899,7 @@ function AnalyzeContent() {
 
         // Process children
         if (node.isDirectory && node.children && node.children.length > 0) {
-          buildHierarchy(node.children, 1, currentAngle, nodeEndAngle, color)
+          buildHierarchy(node.children, 1, currentAngle, nodeEndAngle, hue)
         }
 
         currentAngle = nodeEndAngle
@@ -964,8 +942,8 @@ function AnalyzeContent() {
           const nodeEndAngle = tinyNodeAngle + nodeAngleRange
 
           if (node.isDirectory && node.children && node.children.length > 0) {
-            const tinyNodeColor = generateColorFromHash(node.name, 0)
-            buildHierarchy(node.children, 1, tinyNodeAngle, nodeEndAngle, tinyNodeColor)
+            const tinyHue = hashName(node.name) % 360
+            buildHierarchy(node.children, 1, tinyNodeAngle, nodeEndAngle, tinyHue)
           }
 
           tinyNodeAngle = nodeEndAngle
@@ -1073,8 +1051,14 @@ function AnalyzeContent() {
   }
 
   // Prepare data (must be before conditional returns)
-  const layers = prepareMultiLayerData(currentLevel)
-  const listData = prepareListData(currentLevel)
+  const layers = useMemo(
+    () => prepareMultiLayerData(currentLevel),
+    [currentLevel, diskInfo, data, t]
+  )
+  const listData = useMemo(
+    () => prepareListData(currentLevel),
+    [currentLevel, diskInfo, data, sortBy, sortOrder]
+  )
 
   // Virtual list using TanStack Virtual
   const rowVirtualizer = useVirtualizer({
@@ -1256,20 +1240,7 @@ function AnalyzeContent() {
           <div className="absolute bottom-1/4 right-1/4 w-24 h-24 bg-primary/5 rounded-full blur-2xl animate-pulse delay-1000"></div>
         </div>
 
-        {/* Cursor Follow Glow */}
-        <div
-          className="fixed pointer-events-none z-10"
-          style={{
-            left: mousePosition.x - 150,
-            top: mousePosition.y - 150,
-            width: '300px',
-            height: '300px',
-            transform: 'translate3d(0, 0, 0)',
-            willChange: 'transform',
-          }}
-        >
-          <div className="w-full h-full bg-primary/8 rounded-full blur-3xl"></div>
-        </div>
+        <CursorGlow />
 
         <div className="w-full max-w-2xl space-y-6 relative z-20">
           <div className="text-center space-y-2">
@@ -1445,20 +1416,7 @@ function AnalyzeContent() {
         <div className="absolute bottom-1/4 right-1/4 w-24 h-24 bg-primary/5 rounded-full blur-2xl animate-pulse delay-1000"></div>
       </div>
 
-      {/* Cursor Follow Glow */}
-      <div
-        className="fixed pointer-events-none z-10"
-        style={{
-          left: mousePosition.x - 150,
-          top: mousePosition.y - 150,
-          width: '300px',
-          height: '300px',
-          transform: 'translate3d(0, 0, 0)',
-          willChange: 'transform',
-        }}
-      >
-        <div className="w-full h-full bg-primary/8 rounded-full blur-3xl"></div>
-      </div>
+      <CursorGlow />
 
       <style jsx>{`
         @keyframes layerFadeIn {
@@ -1837,8 +1795,6 @@ function AnalyzeContent() {
           ref={tooltipRef}
           className="fixed pointer-events-none"
           style={{
-            left: `${tooltip.x}px`,
-            top: `${tooltip.y}px`,
             zIndex: 999999,
           }}
         >
