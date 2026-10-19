@@ -21,6 +21,16 @@ interface FileNode {
   isDirectory: boolean
 }
 
+// Flat scan payload. One slot per node: n[i] name, s[i] size.
+// m repeats childOff, childCount, flags (bit 0 = directory). k holds child indexes. r lists roots.
+interface PackedForest {
+  n: string[]
+  s: number[]
+  m: number[]
+  k: number[]
+  r: number[]
+}
+
 interface ChartData {
   name: string
   value: number
@@ -182,85 +192,56 @@ function formatBytesCompact(bytes: number): string {
   }
 }
 
-function rebuildTreeFromCompactNodes(rootNode: FileNode, compactNodes: any[]): FileNode {
-  const nodeMap = new Map<string, FileNode>()
-
-  const rootPathNormalized = rootNode.path.toLowerCase().replace(/\\/g, '/').replace(/\/+$/, '')
-
-  const rootCopy = { ...rootNode }
-  nodeMap.set(rootPathNormalized, rootCopy)
-
-  compactNodes.forEach((compactNode, index) => {
-    expandAndAddToMap(compactNode, rootNode.path, nodeMap)
-  })
-
-  const childrenMap = new Map<string, FileNode[]>()
-
-
-  nodeMap.forEach((node, normalizedPath) => {
-    if (normalizedPath === rootPathNormalized) {
-      return
+function rebuildTreeFromCompactNodes(rootNode: FileNode, forests: PackedForest[]): FileNode {
+  const rootCopy: FileNode = { ...rootNode, children: [] }
+  for (const forest of forests) {
+    if (!forest?.n || !forest.r || !forest.m || !forest.k || !forest.s) continue
+    const nodes = unpackForest(forest)
+    for (const rootIndex of forest.r) {
+      const node = nodes[rootIndex]
+      if (!node) continue
+      assignPackedPaths(node, rootNode.path)
+      rootCopy.children!.push(node)
     }
-
-    const lastSlashIndex = normalizedPath.lastIndexOf('/')
-    let parentPath: string
-
-    if (lastSlashIndex <= 0) {
-      parentPath = rootPathNormalized
-    } else {
-      parentPath = normalizedPath.substring(0, lastSlashIndex)
-
-      if (parentPath.length === 2 && parentPath.endsWith(':')) {
-        parentPath = rootPathNormalized
-      }
-    }
-
-    if (!childrenMap.has(parentPath)) {
-      childrenMap.set(parentPath, [])
-    }
-    childrenMap.get(parentPath)!.push(node)
-  })
-
-  let assignedCount = 0
-  nodeMap.forEach((node, normalizedPath) => {
-    const children = childrenMap.get(normalizedPath) || []
-    if (children.length > 0) {
-      node.children = children
-      assignedCount++
-    } else {
-      node.children = []
-    }
-  })
-
-  const result = nodeMap.get(rootPathNormalized)
-
-  return result || rootNode
+  }
+  return rootCopy
 }
 
-function expandAndAddToMap(compactNode: any, parentPath: string, nodeMap: Map<string, FileNode>) {
-  let nodePath: string
-  if (parentPath.endsWith('\\') || parentPath.endsWith('/')) {
-    nodePath = `${parentPath}${compactNode.n}`
-  } else {
-    nodePath = `${parentPath}\\${compactNode.n}`
+function unpackForest(forest: PackedForest): FileNode[] {
+  const count = forest.n.length
+  const nodes: FileNode[] = new Array(count)
+  for (let i = 0; i < count; i++) {
+    nodes[i] = {
+      name: forest.n[i],
+      size: forest.s[i],
+      path: '',
+      isDirectory: (forest.m[i * 3 + 2] & 1) !== 0,
+      children: [],
+    }
   }
-
-  const normalizedPath = nodePath.toLowerCase().replace(/\\/g, '/').replace(/\/+$/, '')
-
-  const node: FileNode = {
-    name: compactNode.n,
-    size: compactNode.s,
-    path: nodePath,
-    isDirectory: compactNode.d,
-    children: []
+  for (let i = 0; i < count; i++) {
+    const childOff = forest.m[i * 3]
+    const childCount = forest.m[i * 3 + 1]
+    if (childCount > 0) {
+      const kids: FileNode[] = new Array(childCount)
+      for (let c = 0; c < childCount; c++) {
+        kids[c] = nodes[forest.k[childOff + c]]
+      }
+      nodes[i].children = kids
+    }
   }
+  return nodes
+}
 
-  nodeMap.set(normalizedPath, node)
-
-  if (compactNode.c && Array.isArray(compactNode.c)) {
-    compactNode.c.forEach((child: any) => {
-      expandAndAddToMap(child, nodePath, nodeMap)
-    })
+function assignPackedPaths(node: FileNode, parentPath: string) {
+  const nodePath = parentPath.endsWith('\\') || parentPath.endsWith('/')
+    ? `${parentPath}${node.name}`
+    : `${parentPath}\\${node.name}`
+  node.path = nodePath
+  if (node.children) {
+    for (const child of node.children) {
+      assignPackedPaths(child, nodePath)
+    }
   }
 }
 
@@ -298,7 +279,7 @@ function AnalyzeContent() {
   const elapsedTimeIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Cache compact nodes from batches
-  const compactNodesCache = useRef<any[]>([])
+  const compactNodesCache = useRef<PackedForest[]>([])
 
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoveredSectorId, setHoveredSectorId] = useState<string | null>(null)
@@ -646,12 +627,12 @@ function AnalyzeContent() {
         // Create channel for streaming batches
         const onBatch = new Channel<{
           nodes: FileNode[];
-          compact_nodes?: any[];  // Batch of compact nodes
+          compact_nodes?: PackedForest[];
           total_scanned: number;
           total_size: number;
           is_complete: boolean;
           root_node?: FileNode;
-          compact_root?: any;  // Compact format from backend
+          compact_root?: PackedForest;
           disk_info?: { total_space: number; available_space: number; used_space: number };
           current_path?: string
         }>()
