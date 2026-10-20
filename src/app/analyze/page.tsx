@@ -1624,7 +1624,7 @@ function AnalyzeContent() {
   }
 
   return (
-    <div className="relative w-[840px] h-screen max-h-screen overflow-hidden">
+    <div className="relative w-full h-screen max-h-screen overflow-hidden">
       <div className="w-full h-full bg-gradient-to-br from-background via-background to-muted/10 flex flex-col relative">
       {/* Background Tech Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">

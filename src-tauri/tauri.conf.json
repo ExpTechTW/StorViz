@@ -36,9 +36,11 @@
         "title": "StorViz - ExpTech Studio",
         "width": 840,
         "height": 630,
-        "resizable": false,
+        "minWidth": 840,
+        "minHeight": 630,
+        "resizable": true,
         "fullscreen": false,
-        "maximizable": false
+        "maximizable": true
       }
     ],
     "security": {
