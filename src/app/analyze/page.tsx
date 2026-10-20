@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useMemo, useLayoutEffect, Suspense } from 'react'
+import { useEffect, useState, useRef, useMemo, useLayoutEffect, Suspense, memo, useImperativeHandle } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, X, ArrowUpDown } from 'lucide-react'
 import { invoke, Channel } from '@tauri-apps/api/core'
@@ -31,6 +31,13 @@ interface PackedForest {
   r: number[]
 }
 
+interface SectorDraw {
+  kind: 'circle' | 'path'
+  d: string
+  r: number
+  strokeWidth: number
+}
+
 interface ChartData {
   name: string
   value: number
@@ -40,6 +47,8 @@ interface ChartData {
   startAngle?: number
   endAngle?: number
   isTinyNode?: boolean // True if this node is merged into "其他" in the chart
+  sectorId?: string
+  draw?: SectorDraw
 }
 
 interface LayerData {
@@ -59,6 +68,48 @@ function generateSectorId(path: string, depth: number): string {
     hash = hash & hash // Convert to 32bit integer
   }
   return Math.abs(hash).toString(16)
+}
+
+function sectorDraw(startAngleDeg: number, endAngleDeg: number, innerRadius: number, outerRadius: number): SectorDraw {
+  const centerX = 200
+  const centerY = 200
+  const angleRange = endAngleDeg - startAngleDeg
+  if (Math.abs(angleRange - 360) < 0.01) {
+    return {
+      kind: 'circle',
+      d: '',
+      r: (innerRadius + outerRadius) / 2,
+      strokeWidth: outerRadius - innerRadius,
+    }
+  }
+
+  const startAngle = startAngleDeg - 90
+  const endAngle = endAngleDeg - 90
+  const startRad = (startAngle * Math.PI) / 180
+  const endRad = (endAngle * Math.PI) / 180
+  const x1 = centerX + innerRadius * Math.cos(startRad)
+  const y1 = centerY + innerRadius * Math.sin(startRad)
+  const x2 = centerX + outerRadius * Math.cos(startRad)
+  const y2 = centerY + outerRadius * Math.sin(startRad)
+  const x3 = centerX + outerRadius * Math.cos(endRad)
+  const y3 = centerY + outerRadius * Math.sin(endRad)
+  const x4 = centerX + innerRadius * Math.cos(endRad)
+  const y4 = centerY + innerRadius * Math.sin(endRad)
+  const largeArc = endAngle - startAngle > 180 ? 1 : 0
+
+  return {
+    kind: 'path',
+    r: 0,
+    strokeWidth: 0.5,
+    d: [
+      `M ${x1} ${y1}`,
+      `L ${x2} ${y2}`,
+      `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${x3} ${y3}`,
+      `L ${x4} ${y4}`,
+      `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${x1} ${y1}`,
+      'Z',
+    ].join(' '),
+  }
 }
 
 // Hash function for consistent color assignment based on name
@@ -192,6 +243,182 @@ function formatBytesCompact(bytes: number): string {
   }
 }
 
+type SunburstHandle = { setHighlight: (sectorId: string | null) => void }
+
+type ChartHandlers = {
+  hover: (sectorId: string, event: React.MouseEvent, label: string, name: string, size: string, icon: any, color: string) => void
+  move: (event: React.MouseEvent) => void
+  leave: () => void
+  activate: (item: ChartData) => void
+}
+
+const SunburstChart = memo(function SunburstChart({
+  layers,
+  centerPrimary,
+  centerSecondary,
+  chartRef,
+  handlersRef,
+}: {
+  layers: LayerData[]
+  centerPrimary: string
+  centerSecondary: string
+  chartRef: React.RefObject<SunburstHandle | null>
+  handlersRef: React.RefObject<ChartHandlers | null>
+}) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  const highlightedRef = useRef<string | null>(null)
+  const layersRef = useRef(layers)
+  layersRef.current = layers
+
+  useImperativeHandle(chartRef, () => ({
+    setHighlight(sectorId: string | null) {
+      const svg = svgRef.current
+      if (!svg || highlightedRef.current === sectorId) return
+      if (highlightedRef.current) {
+        const prev = CSS.escape(highlightedRef.current)
+        svg.querySelectorAll(`[data-sector-id="${prev}"]`).forEach(el => el.classList.remove('hovered'))
+      }
+      svg.classList.toggle('chart-dimming', sectorId !== null)
+      if (sectorId) {
+        const next = CSS.escape(sectorId)
+        svg.querySelectorAll(`[data-sector-id="${next}"]`).forEach(el => el.classList.add('hovered'))
+      }
+      highlightedRef.current = sectorId
+    },
+  }), [chartRef])
+
+  const hitTest = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return null
+    const el = target.closest('.chart-sector')
+    if (!el || !svgRef.current?.contains(el)) return null
+    const layer = Number(el.getAttribute('data-layer'))
+    const index = Number(el.getAttribute('data-index'))
+    const item = layersRef.current[layer]?.data[index]
+    if (!item?.sectorId) return null
+    return item
+  }
+
+  return (
+    <div style={{ display: 'contents' }}>
+      <style jsx>{`
+        @keyframes layerFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .chart-sector {
+          transition: opacity 0.15s ease;
+          cursor: pointer;
+        }
+        .chart-dimming .chart-sector {
+          opacity: 0.15 !important;
+        }
+        .chart-dimming .chart-sector:hover,
+        .chart-dimming .chart-sector.hovered {
+          opacity: 1 !important;
+        }
+      `}</style>
+      <svg
+        ref={svgRef}
+        width="100%"
+        height="100%"
+        viewBox="0 0 400 400"
+        className="chart-container max-h-full transition-all duration-500 ease-in-out"
+        style={{ opacity: 1, transform: 'scale(1)' }}
+        onMouseOver={(event) => {
+          const item = hitTest(event.target)
+          if (!item?.sectorId) return
+          const fileTypeInfo = getFileTypeInfo(item.name, item.node.isDirectory)
+          handlersRef.current?.hover(
+            item.sectorId,
+            event,
+            fileTypeInfo.label,
+            item.name,
+            formatBytes(item.value),
+            fileTypeInfo.icon,
+            fileTypeInfo.color,
+          )
+        }}
+        onMouseMove={(event) => {
+          if (!hitTest(event.target)) return
+          handlersRef.current?.move(event)
+        }}
+        onMouseLeave={() => handlersRef.current?.leave()}
+        onClick={(event) => {
+          const item = hitTest(event.target)
+          if (!item) return
+          handlersRef.current?.activate(item)
+        }}
+      >
+        <text
+          x="200"
+          y="195"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="fill-foreground transition-all duration-300"
+          style={{ fontSize: '18px', fontWeight: 'bold' }}
+        >
+          {centerPrimary}
+        </text>
+        <text
+          x="200"
+          y="215"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="fill-muted-foreground transition-all duration-300"
+          style={{ fontSize: '14px', fontWeight: '500' }}
+        >
+          {centerSecondary}
+        </text>
+        {layers.map((layer, layerIndex) => (
+          <g key={`layer-${layerIndex}`}>
+            {layer.data.map((item, index) => {
+              const draw = item.draw
+              if (!draw) return null
+              const sectorId = item.sectorId
+              const style = {
+                cursor: 'pointer',
+                animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`,
+              }
+              if (draw.kind === 'circle') {
+                return (
+                  <circle
+                    key={`sector-${layerIndex}-${index}`}
+                    cx={200}
+                    cy={200}
+                    r={draw.r}
+                    fill="transparent"
+                    strokeWidth={draw.strokeWidth}
+                    stroke={item.color}
+                    className="chart-sector"
+                    data-sector-id={sectorId}
+                    data-layer={layerIndex}
+                    data-index={index}
+                    style={style}
+                  />
+                )
+              }
+              return (
+                <path
+                  key={`sector-${layerIndex}-${index}`}
+                  d={draw.d}
+                  fill={item.color}
+                  stroke="rgba(0,0,0,0.1)"
+                  strokeWidth={0.5}
+                  className="chart-sector"
+                  data-sector-id={sectorId}
+                  data-layer={layerIndex}
+                  data-index={index}
+                  style={style}
+                />
+              )
+            })}
+          </g>
+        ))}
+      </svg>
+    </div>
+  )
+})
+
 function rebuildTreeFromCompactNodes(rootNode: FileNode, forests: PackedForest[]): FileNode {
   const rootCopy: FileNode = { ...rootNode, children: [] }
   for (const forest of forests) {
@@ -281,12 +508,15 @@ function AnalyzeContent() {
   // Cache compact nodes from batches
   const compactNodesCache = useRef<PackedForest[]>([])
 
-  const svgRef = useRef<SVGSVGElement>(null)
+  const chartRef = useRef<SunburstHandle>(null)
+  const chartHandlersRef = useRef<ChartHandlers | null>(null)
+  const hoverIdRef = useRef<string | null>(null)
   const [hoveredSectorId, setHoveredSectorId] = useState<string | null>(null)
   const [tooltip, setTooltip] = useState<{ content: string; label: string; size: string; icon: any; color: string } | null>(null)
 
   const tooltipRef = useRef<HTMLDivElement>(null)
   const tooltipMouseRef = useRef({ x: 0, y: 0 })
+  const tooltipSizeRef = useRef({ w: 200, h: 70 })
   const listContainerRef = useRef<HTMLDivElement>(null)
 
   const positionTooltip = (mouseX: number, mouseY: number) => {
@@ -295,8 +525,8 @@ function AnalyzeContent() {
 
     const offsetX = 8
     const offsetY = 8
-    const tooltipWidth = el.offsetWidth || 200
-    const tooltipHeight = el.offsetHeight || 70
+    const tooltipWidth = tooltipSizeRef.current.w
+    const tooltipHeight = tooltipSizeRef.current.h
     const isLeftHalf = mouseX < window.innerWidth / 2
     const isTopHalf = mouseY < window.innerHeight / 2
     const x = isLeftHalf ? mouseX + offsetX : mouseX - tooltipWidth - offsetX
@@ -306,12 +536,29 @@ function AnalyzeContent() {
   }
 
   useLayoutEffect(() => {
-    if (!tooltip) return
+    const el = tooltipRef.current
+    if (!tooltip || !el) return
+    tooltipSizeRef.current = {
+      w: el.offsetWidth || 200,
+      h: el.offsetHeight || 70,
+    }
     positionTooltip(tooltipMouseRef.current.x, tooltipMouseRef.current.y)
   }, [tooltip])
 
+  const clearHover = () => {
+    chartRef.current?.setHighlight(null)
+    if (hoverIdRef.current === null) return
+    hoverIdRef.current = null
+    setHoveredSectorId(null)
+    setTooltip(null)
+  }
+
   const handleHover = (sectorId: string, event: React.MouseEvent, label: string, name: string, size: string, icon: any, color: string) => {
     tooltipMouseRef.current = { x: event.clientX, y: event.clientY }
+    chartRef.current?.setHighlight(sectorId)
+    positionTooltip(event.clientX, event.clientY)
+    if (hoverIdRef.current === sectorId) return
+    hoverIdRef.current = sectorId
     setHoveredSectorId(sectorId)
     setTooltip(prev => {
       if (prev && prev.content === name && prev.label === label && prev.size === size && prev.color === color && prev.icon === icon) {
@@ -319,15 +566,13 @@ function AnalyzeContent() {
       }
       return { content: name, label, size, icon, color }
     })
-    positionTooltip(event.clientX, event.clientY)
   }
   const handleMouseMove = (event: React.MouseEvent) => {
     tooltipMouseRef.current = { x: event.clientX, y: event.clientY }
     positionTooltip(event.clientX, event.clientY)
   }
   const handleLeave = () => {
-    setHoveredSectorId(null)
-    setTooltip(null)
+    clearHover()
   }
 
   const handleCancelScan = async () => {
@@ -571,33 +816,6 @@ function AnalyzeContent() {
     return filterNode(root) || root
   }
 
-  // Sync hover states between chart and file list
-  useEffect(() => {
-    if (!svgRef.current) return
-
-    const updateElements = (elements: NodeListOf<Element>, className: string) => {
-      elements.forEach(element => {
-        const sectorId = element.getAttribute('data-sector-id')
-        element.classList.remove('hovered', 'dimmed')
-
-        if (hoveredSectorId && sectorId === hoveredSectorId) {
-          element.classList.add('hovered')
-        } else if (hoveredSectorId) {
-          element.classList.add('dimmed')
-        }
-      })
-    }
-
-    // Update chart sectors
-    updateElements(svgRef.current.querySelectorAll('.chart-sector'), 'chart-sector')
-
-    // Update file list items
-    const fileListContainer = document.querySelector('.file-list')
-    if (fileListContainer) {
-      updateElements(fileListContainer.querySelectorAll('.file-item'), 'file-item')
-    }
-  }, [hoveredSectorId])
-
   useEffect(() => {
     if (!path) return
 
@@ -751,7 +969,7 @@ function AnalyzeContent() {
   }
 
   // Helper functions must be defined before use
-  const prepareMultiLayerData = (rootNode: FileNode | null, maxDepth: number = 8): LayerData[] => {
+  const prepareMultiLayerData = (rootNode: FileNode | null, availableLabel: string, maxDepth: number = 8): LayerData[] => {
     if (!rootNode || !rootNode.children) return []
 
     const layers: Map<number, ChartData[]> = new Map()
@@ -944,12 +1162,12 @@ function AnalyzeContent() {
         const availableEndAngle = currentAngle + availableAngleRange
 
          layers.get(0)!.push({
-           name: t('analyze.chart.availableSpace'),
+           name: availableLabel,
            value: logicalAvailableSpace,
            color: 'rgba(128, 128, 128, 0.4)',
            path: '__available__',
            node: {
-             name: t('analyze.chart.availableSpace'),
+             name: availableLabel,
              size: logicalAvailableSpace,
              path: '__available__',
              isDirectory: false
@@ -965,6 +1183,10 @@ function AnalyzeContent() {
     layers.forEach((data, depth) => {
       const innerRadius = 50 + (depth * layerThickness)
       const outerRadius = innerRadius + layerThickness - 2
+      for (const item of data) {
+        item.sectorId = generateSectorId(item.path, depth)
+        item.draw = sectorDraw(item.startAngle || 0, item.endAngle || 0, innerRadius, outerRadius)
+      }
 
       result.push({
         data,
@@ -1027,14 +1249,16 @@ function AnalyzeContent() {
         path: child.path,
         node: child,
         isTinyNode, // Mark if this should be grouped in "其他"
+        sectorId: isTinyNode ? generateSectorId('__others__', 0) : generateSectorId(child.path, 0),
       }
     })
   }
 
   // Prepare data (must be before conditional returns)
+  const availableLabel = t('analyze.chart.availableSpace')
   const layers = useMemo(
-    () => prepareMultiLayerData(currentLevel),
-    [currentLevel, diskInfo, data, t]
+    () => prepareMultiLayerData(currentLevel, availableLabel),
+    [currentLevel, diskInfo, data, availableLabel]
   )
   const listData = useMemo(
     () => prepareListData(currentLevel),
@@ -1078,6 +1302,7 @@ function AnalyzeContent() {
   // Helper function to navigate to a node (used by both chart and file list)
   const navigateToNode = (targetNode: FileNode) => {
     if (!targetNode.isDirectory || !targetNode.children) return
+    clearHover()
 
     // Check if node is a direct child of current level (most common case)
     if (currentLevel?.children?.some(child => child.path === targetNode.path)) {
@@ -1388,6 +1613,16 @@ function AnalyzeContent() {
     }
   }
 
+  const centerParts = formatBytesCompact(currentLevel?.size || 0).split(' ')
+  chartHandlersRef.current = {
+    hover: handleHover,
+    move: handleMouseMove,
+    leave: handleLeave,
+    activate: (item) => {
+      if (item.name !== '可用空間') navigateToNode(item.node)
+    },
+  }
+
   return (
     <div className="relative w-[840px] h-screen max-h-screen overflow-hidden">
       <div className="w-full h-full bg-gradient-to-br from-background via-background to-muted/10 flex flex-col relative">
@@ -1400,42 +1635,20 @@ function AnalyzeContent() {
       <CursorGlow />
 
       <style jsx>{`
-        @keyframes layerFadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-        
-        /* JavaScript controlled hover effects with CSS transitions */
-        .chart-sector {
-          transition: opacity 0.15s ease;
-          cursor: pointer;
-        }
-
-        .chart-sector.hovered {
-          opacity: 1 !important;
-        }
-
-        .chart-sector.dimmed {
-          opacity: 0.15 !important;
-        }
-        
         .file-item {
           transition: opacity 0.15s ease, background-color 0.15s ease;
           cursor: pointer;
         }
-        
-        .file-item.hovered {
-          background-color: rgba(239, 68, 68, 0.05) !important;
-        }
 
-        .file-item.dimmed {
+        .file-list.dimming .file-item {
           opacity: 0.3 !important;
         }
 
+        .file-list.dimming .file-item:hover,
+        .file-list.dimming .file-item.hovered {
+          opacity: 1 !important;
+          background-color: rgba(239, 68, 68, 0.05) !important;
+        }
       `}</style>
       {/* Header */}
       <div className="flex items-center justify-between bg-card/60 backdrop-blur-md border-b border-border/50 px-3 py-2 shadow-sm flex-shrink-0 relative z-20">
@@ -1495,141 +1708,14 @@ function AnalyzeContent() {
           </div>
           {layers.length > 0 ? (
             <div className="flex-1 flex items-center justify-center" style={{ overflow: 'hidden' }}>
-              <svg
-                ref={svgRef}
+              <SunburstChart
                 key={currentLevel?.path || 'root'}
-                width="100%"
-                height="100%"
-                viewBox="0 0 400 400"
-                className="chart-container max-h-full transition-all duration-500 ease-in-out"
-                style={{
-                  opacity: 1,
-                  transform: 'scale(1)'
-                }}
-                onMouseLeave={handleLeave}
-              >
-                    {/* Center size display */}
-                    <text
-                      x="200"
-                      y="195"
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      className="fill-foreground transition-all duration-300"
-                      style={{ fontSize: '18px', fontWeight: 'bold' }}
-                    >
-                      {formatBytesCompact(currentLevel?.size || 0).split(' ')[0]}
-                    </text>
-                    <text
-                      x="200"
-                      y="215"
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      className="fill-muted-foreground transition-all duration-300"
-                      style={{ fontSize: '14px', fontWeight: '500' }}
-                    >
-                      {formatBytesCompact(currentLevel?.size || 0).split(' ')[1]}
-                    </text>
-                    {layers.map((layer, layerIndex) => {
-                      const centerX = 200
-                      const centerY = 200
-
-                      return (
-                        <g key={`layer-${layerIndex}`}>
-                          {layer.data.map((item, index) => {
-                            const angleRange = (item.endAngle || 0) - (item.startAngle || 0)
-                            const sectorId = generateSectorId(item.path, layer.depth)
-
-                            // Special case: full circle (360°)
-                            if (Math.abs(angleRange - 360) < 0.01) {
-                              const radius = (layer.innerRadius + layer.outerRadius) / 2
-
-                              return (
-                                <g key={`sector-${layerIndex}-${index}`}>
-                                  <circle
-                                    cx={centerX}
-                                    cy={centerY}
-                                    r={radius}
-                                    fill="transparent"
-                                    strokeWidth={layer.outerRadius - layer.innerRadius}
-                                    stroke={item.color}
-                                    className="chart-sector"
-                                    data-sector-id={sectorId}
-                                    onMouseEnter={(e) => {
-                                      const fileTypeInfo = getFileTypeInfo(item.name, item.node.isDirectory)
-                                      handleHover(sectorId, e, fileTypeInfo.label, item.name, formatBytes(item.value), fileTypeInfo.icon, fileTypeInfo.color)
-                                    }}
-                                    onMouseMove={handleMouseMove}
-                                    style={{
-                                      cursor: 'pointer',
-                                      animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
-                                    }}
-                                    onClick={() => {
-                                      if (item.name !== '可用空間') {
-                                        navigateToNode(item.node)
-                                      }
-                                    }}
-                                  >
-                                  </circle>
-                                </g>
-                              )
-                            }
-
-                            const startAngle = (item.startAngle || 0) - 90
-                            const endAngle = (item.endAngle || 0) - 90
-                            const startRad = (startAngle * Math.PI) / 180
-                            const endRad = (endAngle * Math.PI) / 180
-
-                            const x1 = centerX + layer.innerRadius * Math.cos(startRad)
-                            const y1 = centerY + layer.innerRadius * Math.sin(startRad)
-                            const x2 = centerX + layer.outerRadius * Math.cos(startRad)
-                            const y2 = centerY + layer.outerRadius * Math.sin(startRad)
-                            const x3 = centerX + layer.outerRadius * Math.cos(endRad)
-                            const y3 = centerY + layer.outerRadius * Math.sin(endRad)
-                            const x4 = centerX + layer.innerRadius * Math.cos(endRad)
-                            const y4 = centerY + layer.innerRadius * Math.sin(endRad)
-
-                            const largeArc = endAngle - startAngle > 180 ? 1 : 0
-
-                            const pathData = [
-                              `M ${x1} ${y1}`,
-                              `L ${x2} ${y2}`,
-                              `A ${layer.outerRadius} ${layer.outerRadius} 0 ${largeArc} 1 ${x3} ${y3}`,
-                              `L ${x4} ${y4}`,
-                              `A ${layer.innerRadius} ${layer.innerRadius} 0 ${largeArc} 0 ${x1} ${y1}`,
-                              'Z'
-                            ].join(' ')
-
-                            return (
-                              <path
-                                key={`sector-${layerIndex}-${index}`}
-                                d={pathData}
-                                fill={item.color}
-                                stroke="rgba(0,0,0,0.1)"
-                                strokeWidth={0.5}
-                                className="chart-sector"
-                                data-sector-id={sectorId}
-                                onMouseEnter={(e) => {
-                                  const fileTypeInfo = getFileTypeInfo(item.name, item.node.isDirectory)
-                                  handleHover(sectorId, e, fileTypeInfo.label, item.name, formatBytes(item.value), fileTypeInfo.icon, fileTypeInfo.color)
-                                }}
-                                onMouseMove={handleMouseMove}
-                                style={{
-                                  cursor: 'pointer',
-                                  animation: `layerFadeIn 0.5s ease-out ${layerIndex * 0.1}s both`
-                                }}
-                                onClick={() => {
-                                  if (item.name !== '可用空間') {
-                                    navigateToNode(item.node)
-                                  }
-                                }}
-                              >
-                              </path>
-                            )
-                          })}
-                        </g>
-                      )
-                    })}
-                  </svg>
+                layers={layers}
+                centerPrimary={centerParts[0]}
+                centerSecondary={centerParts[1] || ''}
+                chartRef={chartRef}
+                handlersRef={chartHandlersRef}
+              />
             </div>
           ) : (
              <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
@@ -1677,7 +1763,7 @@ function AnalyzeContent() {
           </div>
           <div
             ref={listContainerRef}
-            className="flex-1 file-list overflow-y-auto custom-scrollbar"
+            className={`flex-1 file-list overflow-y-auto custom-scrollbar${hoveredSectorId ? ' dimming' : ''}`}
             onMouseLeave={handleLeave}
           >
             <div
@@ -1689,7 +1775,7 @@ function AnalyzeContent() {
             >
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                 const item = listData[virtualRow.index]
-                const sectorId = item.isTinyNode ? generateSectorId('__others__', 0) : generateSectorId(item.path, 0)
+                const sectorId = item.sectorId || (item.isTinyNode ? generateSectorId('__others__', 0) : generateSectorId(item.path, 0))
                 const fileTypeInfo = getFileTypeInfo(item.name, item.node.isDirectory)
                 const IconComponent = fileTypeInfo.icon
                 const isSelected = selectedFiles.has(item.path)
@@ -1712,6 +1798,8 @@ function AnalyzeContent() {
                   >
                     <div
                       className={`flex items-center justify-between p-2 rounded transition-all duration-300 cursor-pointer border file-item hover:bg-card/80 hover:border-primary/20 hover:scale-[1.02] hover:shadow-md group relative overflow-hidden mx-1 ${
+                        hoveredSectorId === sectorId ? 'hovered' : ''
+                      } ${
                         isSelected 
                           ? 'bg-primary/10 border-primary/40' 
                           : willBeDeleted 
